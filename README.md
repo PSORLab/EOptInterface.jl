@@ -19,7 +19,7 @@ register_nlsystem(::Model, ::ODESystem, obj::Num, ineqs::Vector{Num})
 Registers algebraic JuMP constraints and objective from ModelingToolkit algebraic models built using `@mtkbuild`.
 
 ```julia
-full_solutions(::ODESystem)
+full_solutions(::Model, ::ODESystem)
 ```
 Returns a dictionary of optimal solution values for all eliminated variables from ModelingToolkit's structural simplification step.
 
