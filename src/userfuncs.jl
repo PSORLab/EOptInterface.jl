@@ -83,11 +83,11 @@ function full_solutions(model::Model, sys::ODESystem)
     end
     soln_dict = Dict()
     for i in eachindex(observed(sys))
-        rhsExpr = observed(s)[i].rhs
+        rhsExpr = observed(sys)[i].rhs
         while ~isempty(intersect(get_variables(rhsExpr),keys(sub_dict)))
             rhsExpr = substitute(rhsExpr, sub_dict)
         end
-        soln_dict[observed(s)[i].lhs] = rhsExpr
+        soln_dict[observed(sys)[i].lhs] = rhsExpr
     end
     return soln_dict
 end
