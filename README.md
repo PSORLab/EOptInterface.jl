@@ -34,7 +34,7 @@ Registers algebraic JuMP constraints from ModelingToolkit differential equation 
 ## Example Usage
 
 ```julia
-using ModelingToolkit, JuMP, EAGO, AcausalOptInterface
+using ModelingToolkit, JuMP, EAGO, EOptInterface
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
 @connector Stream begin
