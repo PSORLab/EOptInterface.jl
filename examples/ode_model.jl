@@ -36,8 +36,7 @@ end
 
 tspan = (0.0,2.0)
 tstep = 0.01
-using CSV, DataFrames
-data = CSV.read("kinetic_intensity_data.csv", DataFrame)
+include("kinetic_intensity_data.jl")
 intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 import Ipopt
@@ -50,5 +49,7 @@ N = Int(floor((tspan[2] - tspan[1])/tstep))+1
 V = length(unknowns(o))
 @variable(model, -75 <= x[1:V,1:N] <= 150.0 )
 register_odesystem(model, o, tspan, tstep, "EE")
-@objective(model, Min, sum((intensity(x[1,i+1],x[2,i+1],x[3,i+1]) - data[!, :intensity][i])^2 for i in 1:(N-1)))
+@objective(model, Min, sum((intensity(x[1,i+1],x[2,i+1],x[3,i+1]) - data[i])^2 for i in 1:(N-1)))
 JuMP.optimize!(model)
+JuMP.value.(p)
+JuMP.value.(x)

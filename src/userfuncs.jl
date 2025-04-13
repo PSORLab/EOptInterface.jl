@@ -43,28 +43,18 @@ function register_odesystem(model::Model, odesys::ODESystem, tspan::Tuple{Number
         push!(dx, dxj)
     end
     # extracting initial conditions from MTK ODESystem -> algebraic JuMP constraint for x[1:V,1]
-    @constraint(model, x[1:V,1] == [ModelingToolkit.defaults(o)[unknowns(o)[i]] for i in eachindex(unknowns(o))])
+    ps = JuMP.all_variables(model)[1:length(setdiff(decision_vars(odesys),unknowns(odesys)))]
+    xs = reshape(setdiff(JuMP.all_variables(model),JuMP.all_variables(model)[1:length(setdiff(decision_vars(odesys),unknowns(odesys)))]), V, N)
+    @constraint(model, xs[:,1] == [ModelingToolkit.defaults(odesys)[unknowns(odesys)[i]] for i in eachindex(unknowns(odesys))])
     # formulating JuMP constraints of ode discretizations
     for i in 1:(N-1)
         for j in 1:V
             if solver == "EE"
-                @constraint(model, x[j,i+1] == x[j,i] + tstep*dx[j](x[:,i]...,p...))
+                @constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]...,ps...))
             elseif solver == "IE"
-                @constraint(model, x[j,i+1] == x[j,i] + tstep*dx[j](x[:,i+1]...,p...))
-            elseif solver == "RK4"
-                k1 = dx[j](x[:,i]...,p...)
-                k2 = dx[j](x[:,i].+tstep/2*k1...,p...)
-                k3 = dx[j](x[:,i].+tstep/2*k2...,p...)
-                k4 = dx[j](x[:,i].+tstep*k3...,p...)
-                @constraint(model, x[j,i+1] == x[j,i] + tstep*(k1 + 2*k2 + 2*k3 + k4)/6)
-            elseif solver == "IRK4"
-                k1 = dx[j](x[:,i+1]...,p...)
-                k2 = dx[j](x[:,i+1].+tstep/2*k1...,p...)
-                k3 = dx[j](x[:,i+1].+tstep/2*k2...,p...)
-                k4 = dx[j](x[:,i+1].+tstep*k3...,p...)
-                @constraint(model, x[j,i+1] == x[j,i] + tstep*(k1 + 2*k2 + 2*k3 + k4)/6)
+                @constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i+1]...,ps...))
             else
-                print("Available integrators: EE, IE, RK4, IRK4")
+                print("Available integrators: EE, IE")
                 break
             end
         end
