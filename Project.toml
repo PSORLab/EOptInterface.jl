@@ -1,7 +1,7 @@
 name = "EOptInterface"
 uuid = "96d9f51d-8c41-4e2d-b1a3-7b48dea3ddd1"
-authors = ["Joseph Choi <joseph03choi@gmail.com>", "Matthew Stuber <stuber@uconn.edu> and contributors"]
-version = "1.0.0-DEV"
+authors = ["Joseph Choi <joseph03choi@gmail.com>", "Matthew Stuber <stuber@uconn.edu>"]
+version = "0.1.0-DEV"
 
 [deps]
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
