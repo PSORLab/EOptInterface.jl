@@ -4,7 +4,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://joseph03choi.github.io/EOptInterface.jl/dev/)
 [![Build Status](https://github.com/joseph03choi/EOptInterface.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/joseph03choi/EOptInterface.jl/actions/workflows/CI.yml?query=branch%3Amaster)
 
-EOptInterface.jl is an abstraction layer for automatically formulating JuMP mathematical programming models from ModelingToolkit acausal (equation-oriented) models.
+EOptInterface.jl is an abstraction layer for automatically formulating JuMP mathematical programming models from ModelingToolkit equation-oriented/acausal models.
 
 ## Feature Summary
 
