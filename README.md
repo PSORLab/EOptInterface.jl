@@ -26,7 +26,7 @@ Returns a dictionary of optimal solution values for all eliminated variables fro
 ```julia
 register_odesystem(::Model, ::ODESystem, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
 ```
-Registers algebraic JuMP constraints from ModelingToolkit differential equation models built using `@mtkbuild`.
+Registers algebraic JuMP constraints from ModelingToolkit differential equation models built using `@mtkbuild`. Available integration schemes: `"EE", "IE"`
 
 
 
@@ -218,7 +218,7 @@ end
 
 tspan = (0.0,2.0)
 tstep = 0.01
-include("kinetic_intensity_data.jl") # ~\examples\kinetic_intensity_data.jl
+include("kinetic_intensity_data.jl") # see \examples\kinetic_intensity_data.jl
 intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 model = Model(EAGO.Optimizer)
