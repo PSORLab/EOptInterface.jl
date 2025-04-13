@@ -13,9 +13,10 @@ function register_nlsystem(model::Model, sys::ODESystem, obj::Num, ineqs::Vector
         gi = mtkns_usereqs(ineqs[i], sys)
         push!(g, gi)
     end
-    @constraint(model, [i in eachindex(h)], h[i](x...) == 0)
-    @constraint(model, [i in eachindex(g)], g[i](x...) ≤ 0)
-    @objective(model, Min, f(x...))
+    
+    @constraint(model, [i in eachindex(h)], h[i](JuMP.all_variables(model)...) == 0)
+    @constraint(model, [i in eachindex(g)], g[i](JuMP.all_variables(model)...) ≤ 0)
+    @objective(model, Min, f(JuMP.all_variables(model)...))
 end
 
 # MTK: ODESystem -> JuMP <<<
@@ -71,11 +72,11 @@ function register_odesystem(model::Model, odesys::ODESystem, tspan::Tuple{Number
 end
 
 # full_solutions(sys::ODESystem) <<<
-function full_solutions(sys::ODESystem, soln)
+function full_solutions(model::Model, sys::ODESystem)
     vars = [unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
     sub_dict = ModelingToolkit.defaults(sys)
     for i in eachindex(vars)
-        sub_dict[vars[i]] = soln[i]
+        sub_dict[vars[i]] = JuMP.value.(JuMP.all_variables(model)[i])
     end
     for eqn in observed(sys)
         sub_dict[eqn.lhs] = eqn.rhs
