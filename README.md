@@ -9,22 +9,22 @@ EOptInterface.jl is an abstraction layer for automatically formulating JuMP math
 ## Feature Summary
 
 ```julia
-decision_vars(::ODESystem)
+decision_vars(::System)
 ```
 Displays the optimization problem decision variables.
 
 ```julia
-register_nlsystem(::Model, ::ODESystem, obj::Num, ineqs::Vector{Num})
+register_nlsystem(::Model, ::System, obj::Num, ineqs::Vector{Num})
 ```
 Registers algebraic JuMP constraints and objective from ModelingToolkit algebraic models built using `@mtkbuild`.
 
 ```julia
-full_solutions(::Model, ::ODESystem)
+full_solutions(::Model, ::System)
 ```
 Returns a dictionary of optimal solution values for all eliminated variables from ModelingToolkit's structural simplification step.
 
 ```julia
-register_odesystem(::Model, ::ODESystem, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
+register_odesystem(::Model, ::System, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
 ```
 Registers algebraic JuMP constraints from ModelingToolkit differential equation models built using `@mtkbuild`. Available integration schemes: `"EE", "IE"`
 
@@ -155,7 +155,8 @@ end
         connect(sep1.outL, sep2.in)
     end
 end
-@mtkbuild s = ReactorSeparatorRecycle()
+
+@mtkcompile s = ReactorSeparatorRecycle()
 
 exprF5 = s.sep2.outV.F
 exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
@@ -215,7 +216,8 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
         I ~ x_A + 2/21*x_B + 2/21*x_D
     end
 end
-@mtkbuild o = KineticParameterEstimation()
+
+@mtkcompile o = KineticParameterEstimation()
 
 tspan = (0.0,2.0)
 tstep = 0.01
