@@ -1,11 +1,25 @@
-# MTK: NonlinearSystem or ODESystem decision vars <<<
-function decision_vars(sys::ODESystem)
+"""
+    decision_vars(sys)
+
+Displays the decision variables for optimization problem of a ModelingToolkit model.
+"""
+function decision_vars(sys::System)
     x = [unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
     return x
 end
 
-# MTK: NLSystem -> JuMP <<<
-function register_nlsystem(model::Model, sys::ODESystem, obj::Num, ineqs::Vector{Num})
+"""
+    register_nlsystem(model, sys, obj, ineqs)
+
+Registers a ModelingToolkit algebraic model, objective function, and inequality constraints as algebraic constraints in JuMP.
+
+# Arguments
+- `model::Model`: the JuMP model
+- `sys::System`: the ModelingToolkit model
+- `obj::Num`: a symbolic expression of the objective function using the ModelingToolkit model variables
+- `ineqs::Vector{Num}`: a vector of symbolic expressions of inequality constraints using the ModelingToolkit model variables
+"""
+function register_nlsystem(model::Model, sys::System, obj::Num, ineqs::Vector{Num})
     h = mtkns_modeleqs(sys)
     f = mtkns_usereqs(obj, sys)
     g = []
@@ -18,8 +32,19 @@ function register_nlsystem(model::Model, sys::ODESystem, obj::Num, ineqs::Vector
     @objective(model, Min, f(JuMP.all_variables(model)...))
 end
 
-# MTK: ODESystem -> JuMP <<<
-function register_odesystem(model::Model, odesys::ODESystem, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
+"""
+    register_nlsystem(model, sys, tspan, tstep, integrator)
+
+Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by discretizing ODEs as a system of algebraic equations.
+
+# Arguments
+- `model::Model`: the JuMP model
+- `sys::System`: the ModelingToolkit model
+- `tspan::Type{Number,Number}`: the time span over which the dynamic model is simulated
+- `tstep::Number`: the time step used in the integration scheme
+- `integrator::String`: integration scheme used in discretization, `"EE"` for Explicit Euler or `"IE"` for Implicit Euler
+"""
+function register_odesystem(model::Model, odesys::System, tspan::Tuple{Number,Number}, tstep::Number, integrator::String)
     N = Int(floor((tspan[2] - tspan[1])/tstep))+1 # number of discrete time nodes
     V = length(unknowns(odesys)) # number of ode variables
     param_dict = copy(ModelingToolkit.defaults(odesys))
@@ -48,9 +73,9 @@ function register_odesystem(model::Model, odesys::ODESystem, tspan::Tuple{Number
     # formulating JuMP constraints of ode discretizations
     for i in 1:(N-1)
         for j in 1:V
-            if solver == "EE"
+            if integrator == "EE"
                 @constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]...,ps...))
-            elseif solver == "IE"
+            elseif integrator == "IE"
                 @constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i+1]...,ps...))
             else
                 print("Available integrators: EE, IE")
@@ -60,8 +85,12 @@ function register_odesystem(model::Model, odesys::ODESystem, tspan::Tuple{Number
     end
 end
 
-# full_solutions(sys::ODESystem) <<<
-function full_solutions(model::Model, sys::ODESystem)
+"""
+    full_solutions(model, sys)
+
+Returns a dictionary of optimal solution values for the observed variables for a ModelingToolkit algebraic model.
+"""
+function full_solutions(model::Model, sys::System)
     vars = [unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
     sub_dict = ModelingToolkit.defaults(sys)
     for i in eachindex(vars)

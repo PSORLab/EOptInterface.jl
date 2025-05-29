@@ -4,13 +4,13 @@ authors = ["Joseph Choi <jsphchoi@mit.edu>", "Matthew Stuber <matthew.stuber@uco
 version = "0.1.0-DEV"
 
 [deps]
-ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 
 [compat]
-julia = "1.11"
-ModelingToolkit = "9"
 JuMP = "1"
+ModelingToolkit = "10"
+julia = "1.11"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

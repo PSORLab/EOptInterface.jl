@@ -1,4 +1,4 @@
-function mtkns_modeleqs(sys::ODESystem)
+function mtkns_modeleqs(sys::System)
     # Create subsitution dictionary for parameters with assigned default values
     param_dict = copy(ModelingToolkit.defaults(sys))
     # Function holder
@@ -25,7 +25,7 @@ function mtkns_modeleqs(sys::ODESystem)
     return func
 end
 
-function mtkns_usereqs(expr::Num, sys::ODESystem)
+function mtkns_usereqs(expr::Num, sys::System)
     # Creates a dictionary of parameter and observed variable substitutions
     sub_dict = ModelingToolkit.defaults(sys)
     for eqn in observed(sys)

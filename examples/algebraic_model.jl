@@ -119,7 +119,8 @@ end
         connect(sep1.outL, sep2.in)
     end
 end
-@mtkbuild s = ReactorSeparatorRecycle()
+
+@mtkcompile s = ReactorSeparatorRecycle()
 
 exprF5 = s.sep2.outV.F
 exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
