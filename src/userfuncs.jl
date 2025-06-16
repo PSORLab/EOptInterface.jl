@@ -33,7 +33,7 @@ function register_nlsystem(model::Model, sys::System, obj::Num, ineqs::Vector{Nu
 end
 
 """
-    register_nlsystem(model, sys, tspan, tstep, integrator)
+    register_odesystem(model, sys, tspan, tstep, integrator)
 
 Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by discretizing ODEs as a system of algebraic equations.
 
