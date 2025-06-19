@@ -671,12 +671,6 @@ git-tree-sha1 = "abb8f57a2768bc152d7acafefcdda01ee374cd11"
 uuid = "3263718b-31ed-49cf-8a0f-35a466e8af96"
 version = "0.1.2"
 
-[[deps.ImplicitDiscreteSolve]]
-deps = ["DiffEqBase", "OrdinaryDiffEqCore", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SymbolicIndexingInterface", "UnPack"]
-git-tree-sha1 = "abb8f57a2768bc152d7acafefcdda01ee374cd11"
-uuid = "3263718b-31ed-49cf-8a0f-35a466e8af96"
-version = "0.1.2"
-
 [[deps.Inflate]]
 git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
