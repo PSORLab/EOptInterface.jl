@@ -32,7 +32,8 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
         I ~ x_A + 2/21*x_B + 2/21*x_D
     end
 end
-@mtkbuild o = KineticParameterEstimation()
+
+@mtkcompile o = KineticParameterEstimation()
 
 tspan = (0.0,2.0)
 tstep = 0.01

@@ -1,41 +1,42 @@
-function mtkns_modeleqs(sys::ODESystem)
+function mtk_generate_model_equations(sys::ModelingToolkit.System)
     # Create subsitution dictionary for parameters with assigned default values
     param_dict = copy(ModelingToolkit.defaults(sys))
     # Function holder
-    func = []
+    funcs = []
     # Create functions for each model equation
-    for i in eachindex(unknowns(sys))
+    for i in eachindex(ModelingToolkit.unknowns(sys))
         # Full model equation 0 = f(x)
-        expr = full_equations(expand_connections(sys))[i].rhs - full_equations(expand_connections(sys))[i].lhs
+        expr = ModelingToolkit.full_equations(ModelingToolkit.expand_connections(sys))[i].rhs 
+            - ModelingToolkit.full_equations(ModelingToolkit.expand_connections(sys))[i].lhs
         # Subsitute all parameter values
-        while ~isempty(intersect(get_variables(expr),keys(param_dict)))
-            expr = substitute(expr, param_dict)
+        while ~isempty(intersect(Symbolics.get_variables(expr),keys(param_dict)))
+            expr = SymbolicUtils.substitute(expr, param_dict)
         end
         # Create function that has inputs: 
         # x = [state variables (unknowns); desgin variables (parameters with no assigned default values)]
-        add_func = build_function(
+        add_func = Symbolics.build_function(
             expr, 
-            unknowns(sys)..., 
+            ModelingToolkit.unknowns(sys)..., 
             setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))..., 
             expression = Val{false}
         )
         # Add function to function holder
-        push!(func, add_func)
+        push!(funcs, add_func)
     end
-    return func
+    return funcs
 end
 
-function mtkns_usereqs(expr::Num, sys::ODESystem)
+function mtk_generate_reduced_expression(expr::Symbolics.Num, sys::ModelingToolkit.System)
     # Creates a dictionary of parameter and observed variable substitutions
     sub_dict = ModelingToolkit.defaults(sys)
-    for eqn in observed(sys)
+    for eqn in ModelingToolkit.observed(sys)
         sub_dict[eqn.lhs] = eqn.rhs
     end
     # Makes substitutions until no substitutions can be made
-    while ~isempty(intersect(string.(get_variables(expr)), string.(keys(sub_dict))))
-        expr = substitute(expr, sub_dict)
+    while ~isempty(intersect(string.(Symbolics.get_variables(expr)), string.(keys(sub_dict))))
+        expr = SymbolicUtils.substitute(expr, sub_dict)
     end
     # Function inputs (design and state variables)
-    x = [unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
-    return build_function(expr, x..., expression = Val{false})
+    x = [ModelingToolkit.unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
+    return Symbolics.build_function(expr, x..., expression = Val{false})
 end
