@@ -16,10 +16,9 @@ function mtk_generate_model_equations(sys::ModelingToolkit.System)
         # x = [state variables (unknowns); desgin variables (parameters with no assigned default values)]
         add_func = Symbolics.build_function(
             expr, 
-            ModelingToolkit.unknowns(sys)..., 
-            setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))..., 
+            EOptInterface.decision_vars(sys)..., 
             expression = Val{false}
-        )
+            )
         # Add function to function holder
         push!(funcs, add_func)
     end
@@ -33,10 +32,8 @@ function mtk_generate_reduced_expression(expr::Symbolics.Num, sys::ModelingToolk
         sub_dict[eqn.lhs] = eqn.rhs
     end
     # Makes substitutions until no substitutions can be made
-    while ~isempty(intersect(string.(Symbolics.get_variables(expr)), string.(keys(sub_dict))))
+    while ~isempty(intersect(Symbolics.get_variables(expr), keys(sub_dict)))
         expr = SymbolicUtils.substitute(expr, sub_dict)
     end
-    # Function inputs (design and state variables)
-    x = [ModelingToolkit.unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
-    return Symbolics.build_function(expr, x..., expression = Val{false})
+    return Symbolics.build_function(expr, EOptInterface.decision_vars(sys)..., expression = Val{false})
 end

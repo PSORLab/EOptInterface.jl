@@ -4,8 +4,10 @@
 Displays the decision variables for optimization problem of a ModelingToolkit model.
 """
 function decision_vars(sys::ModelingToolkit.System)
-    x = [ModelingToolkit.unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
-    return x
+    return [
+        ModelingToolkit.unknowns(sys); 
+        setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))
+        ]
 end
 
 """
@@ -60,12 +62,12 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
         end
         dxj = build_function(
             dxj_expr,
-            ModelingToolkit.unknowns(odesys)...,
-            setdiff(ModelingToolkit.parameters(odesys),keys(ModelingToolkit.defaults(odesys)))..., 
+            EOptInterface.decision_vars(odesys)..., 
             expression = Val{false}
-        )
+            )
         push!(dx, dxj)
     end
+    dx = EOptInterface.mtk_generate_model_equations(odesys)
     # extracting initial conditions from MTK ODESystem -> algebraic JuMP constraint for x[1:V,1]
     ps = JuMP.all_variables(model)[1:length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))]
     xs = reshape(setdiff(JuMP.all_variables(model),JuMP.all_variables(model)[1:length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))]), V, N)
@@ -91,7 +93,7 @@ end
 Returns a dictionary of optimal solution values for the observed variables for a ModelingToolkit algebraic model.
 """
 function full_solutions(model::JuMP.Model, sys::ModelingToolkit.System)
-    vars = [ModelingToolkit.unknowns(sys); setdiff(ModelingToolkit.parameters(sys),keys(ModelingToolkit.defaults(sys)))]
+    vars = decision_vars(sys)
     sub_dict = ModelingToolkit.defaults(sys)
     for i in eachindex(vars)
         sub_dict[vars[i]] = JuMP.value.(JuMP.all_variables(model)[i])
