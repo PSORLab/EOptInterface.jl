@@ -122,6 +122,8 @@ end
 
 @mtkcompile s = ReactorSeparatorRecycle()
 
+# Symbolic expressions of constraints and objective
+# Use syntax System.Component.Stream.Variable, System.Component.Stream.Parameter, or System.Component.Parameter
 exprF5 = s.sep2.outV.F
 exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
 f_CSTR = (25764 + 8178*s.cstr.V)/2.5
@@ -136,10 +138,10 @@ obj = f_CSTR + f_Sep
 
 using EAGO
 model = Model(EAGO.Optimizer)
-decision_vars(s)
+decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
 xL = zeros(6)
 xU = [100, 1, 1, 1, 100, 10]
-@variable(model, xL[i] <= x[i=1:6] <= xU[i])
+@variable(model, xL[i] <= x[i=1:6] <= xU[i]) # ̂x = (̂z,p), ̂z = (...(t)...), p = (influent₊F, cstr₊V)
 register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
 JuMP.value.(x)

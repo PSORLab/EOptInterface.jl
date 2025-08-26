@@ -67,9 +67,9 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
             )
         push!(dx, dxj)
     end
+    ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))+1:end]
+    xs = reshape(setdiff(JuMP.all_variables(model),ps), V, N)
     # extracting initial conditions from MTK ODESystem -> algebraic JuMP constraint for x[1:V,1]
-    ps = JuMP.all_variables(model)[1:length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))]
-    xs = reshape(setdiff(JuMP.all_variables(model),JuMP.all_variables(model)[1:length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))]), V, N)
     JuMP.@constraint(model, xs[:,1] == [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))])
     # formulating JuMP constraints of ode discretizations
     for i in 1:(N-1)

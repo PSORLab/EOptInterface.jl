@@ -42,15 +42,17 @@ intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 using EAGO
 model = Model(EAGO.Optimizer)
-decision_vars(o)
-pL = [0.001, 10, 10]
-pU = [40, 1200, 1200]
-@variable(model, pL[i] <= p[i=1:3] <= pU[i])
+decision_vars(o) # Displays: x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4
+# FIRST, Create discretized state decision variables
 N = Int(floor((tspan[2] - tspan[1])/tstep))+1
 V = length(unknowns(o))
-@variable(model, -75 <= x[1:V,1:N] <= 150.0 )
+@variable(model, -75 <= z[1:V,1:N] <= 150.0 ) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
+# SECOND, Create free design decision variables second
+pL = [0.001, 10, 10]
+pU = [40, 1200, 1200]
+@variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
 register_odesystem(model, o, tspan, tstep, "EE")
-@objective(model, Min, sum((intensity(x[1,i+1],x[2,i+1],x[3,i+1]) - data[i])^2 for i in 1:(N-1)))
+@objective(model, Min, sum((intensity(z[5,i+1],z[4,i+1],z[3,i+1]) - data[i])^2 for i in 1:(N-1)))
 JuMP.optimize!(model)
+JuMP.value.(z)
 JuMP.value.(p)
-JuMP.value.(x)
