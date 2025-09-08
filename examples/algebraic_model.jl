@@ -50,7 +50,7 @@ end
         out = Stream()
     end
     @parameters begin
-        V
+        V   # Free design variable
         k_1 = 0.4
         k_2 = 0.055
     end
@@ -123,7 +123,7 @@ end
 @mtkcompile s = ReactorSeparatorRecycle()
 
 # Symbolic expressions of constraints and objective
-# Use syntax System.Component.Stream.Variable, System.Component.Stream.Parameter, or System.Component.Parameter
+# Use syntax System.Component.Connector.Variable, System.Component.Component.Parameter, or System.Component.Parameter
 exprF5 = s.sep2.outV.F
 exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
 f_CSTR = (25764 + 8178*s.cstr.V)/2.5
@@ -136,13 +136,78 @@ g1 = 25 - exprF5
 g2 = 475/3600 - exprTau
 obj = f_CSTR + f_Sep
 
-using EAGO
-model = Model(EAGO.Optimizer)
+using Ipopt
+# Reduced model w/ Ipopt
+@mtkcompile s = ReactorSeparatorRecycle()
 decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
+model = Model(Ipopt.Optimizer)
 xL = zeros(6)
 xU = [100, 1, 1, 1, 100, 10]
-@variable(model, xL[i] <= x[i=1:6] <= xU[i]) # ̂x = (̂z,p), ̂z = (...(t)...), p = (influent₊F, cstr₊V)
+@variable(model, xL[i] <= x[i=1:6] <= xU[i])
 register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
-JuMP.value.(x)
 full_solutions(model, s)
+println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
+println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
+println("f^* = $(round(JuMP.objective_value(model),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
+
+# Unsimplified model w/ Ipopt
+@named fs = ReactorSeparatorRecycle()
+decision_vars(fs)
+fmodel = Model(Ipopt.Optimizer)
+xL = zeros(50)
+xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
+@variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
+register_nlsystem(fmodel, fs, obj, [g1, g2])
+JuMP.optimize!(fmodel)
+println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
+println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
+println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
+
+using EAGO
+# Reduced model w/ EAGO
+@mtkcompile s = ReactorSeparatorRecycle()
+decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
+model = Model(EAGO.Optimizer)
+xL = zeros(6)
+xU = [100, 1, 1, 1, 100, 10]
+@variable(model, xL[i] <= x[i=1:6] <= xU[i])
+register_nlsystem(model, s, obj, [g1, g2])
+JuMP.optimize!(model)
+full_solutions(model, s)
+println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
+println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
+println("f^* = $(round(JuMP.objective_value(model),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
+
+# Unsimplified model w/ EAGO
+@named fs = ReactorSeparatorRecycle()
+decision_vars(fs)
+fmodel = Model(EAGO.Optimizer)
+xL = zeros(50)
+xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
+@variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
+register_nlsystem(fmodel, fs, obj, [g1, g2])
+JuMP.optimize!(fmodel)
+println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
+println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
+println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
+
+using MadNLP
+# Reduced model w/ EAGO
+@mtkcompile s = ReactorSeparatorRecycle()
+decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
+model = Model(()->MadNLP.Optimizer(print_level=MadNLP.INFO, max_iter=100))
+xL = zeros(6)
+xU = [100, 1, 1, 1, 100, 10]
+@variable(model, xL[i] <= x[i=1:6] <= xU[i])
+register_nlsystem(model, s, obj, [g1, g2])
+JuMP.optimize!(model)
+full_solutions(model, s)
+println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
+println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
+println("f^* = $(round(JuMP.objective_value(model),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")

@@ -46,7 +46,7 @@ Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by di
 - `tstep::Number`: the time step used in the integration scheme
 - `integrator::String`: integration scheme used in discretization, `"EE"` for Explicit Euler or `"IE"` for Implicit Euler
 """
-function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Number,Number}, tstep::Number, integrator::String)
+function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     N = Int(floor((tspan[2] - tspan[1])/tstep))+1 # number of discrete time nodes
     V = length(ModelingToolkit.unknowns(odesys)) # number of ode variables
     param_dict = copy(ModelingToolkit.defaults(odesys))
@@ -72,17 +72,12 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
     # extracting initial conditions from MTK ODESystem -> algebraic JuMP constraint for x[1:V,1]
     JuMP.@constraint(model, xs[:,1] == [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))])
     # formulating JuMP constraints of ode discretizations
-    for i in 1:(N-1)
-        for j in 1:V
-            if integrator == "EE"
-                JuMP.@constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]...,ps...))
-            elseif integrator == "IE"
-                JuMP.@constraint(model, xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i+1]...,ps...))
-            else
-                print("Available integrators: EE, IE")
-                break
-            end
-        end
+    if integrator == "EE"
+        JuMP.@constraint(model, [j in 1:V,i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]...,ps...))
+    elseif integrator == "IE"
+        JuMP.@constraint(model, [j in 1:V,i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i+1]...,ps...))
+    else
+        print("Available integrators: EE, IE")
     end
 end
 
