@@ -18,7 +18,7 @@ Displays the optimization problem decision variables.
 ```julia
 register_nlsystem(::Model, ::System, obj::Num, ineqs::Vector{Num})
 ```
-Registers algebraic JuMP constraints and objective from ModelingToolkit algebraic models built using `@mtkbuild`.
+Registers algebraic JuMP constraints and objective from ModelingToolkit algebraic `System`s built using `@mtkbuild`.
 
 ```julia
 full_solutions(::Model, ::System)
@@ -28,7 +28,7 @@ Returns a dictionary of optimal solution values for all eliminated variables fro
 ```julia
 register_odesystem(::Model, ::System, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
 ```
-Registers algebraic JuMP constraints from ModelingToolkit differential equation models built using `@mtkbuild`. Available integration schemes: `"EE", "IE"`
+Registers algebraic JuMP constraints from ModelingToolkit ODE `System`s built using `@mtkbuild`. Available integration schemes: `"EE", "IE"`
 
 
 
@@ -180,9 +180,10 @@ xU = [100, 1, 1, 1, 100, 10]
 @variable(model, xL[i] <= x[i=1:6] <= xU[i])
 register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
+JuMP.value.(x)
 full_solutions(model, s)
 ```
-Optimizing ODE `@mtkbuild` models using EAGO solver
+Optimizing ODE `System`s using EAGO solver
 ```julia
 using ModelingToolkit, JuMP, EOptInterface
 using ModelingToolkit: t_nounits as t, D_nounits as D
@@ -223,20 +224,20 @@ end
 
 tspan = (0.0,2.0)
 tstep = 0.01
-include("kinetic_intensity_data.jl") # see \examples\kinetic_intensity_data.jl
+include("kinetic_intensity_data.jl")
 intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 using EAGO
 model = Model(EAGO.Optimizer)
 decision_vars(o)
-pL = [0.001, 10, 10]
-pU = [40, 1200, 1200]
-@variable(model, pL[i] <= p[i=1:3] <= pU[i])
 N = Int(floor((tspan[2] - tspan[1])/tstep))+1
 V = length(unknowns(o))
-@variable(model, -75 <= x[1:V,1:N] <= 150.0 )
+@variable(model, -75 <= z[1:V,1:N] <= 150.0 ) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
+pL = [10, 10, 0.001]
+pU = [1200, 1200, 40]
+@variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
 register_odesystem(model, o, tspan, tstep, "EE")
-@objective(model, Min, sum((intensity(x[1,i+1],x[2,i+1],x[3,i+1]) - data[i])^2 for i in 1:(N-1)))
+@objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
 JuMP.optimize!(model)
 ```
 
@@ -244,3 +245,4 @@ JuMP.optimize!(model)
 1. Y. Ma, S. Gowda, R. Anantharaman, C. Laughman, V. Shah, and C. Rackauckas, **ModelingToolkit: A composable graph transformation system for equation-based modeling**, 2021.
 2. M. Lubin, O. Dowson, J. Dias Garcia, J. Huchette, B. Legat, and J. P. Vielma, **JuMP 1.0: Recent improvements to a modeling language for mathematical optimization**, *Mathematical Programming Computation*, vol. 15, p. 581-589, 2023.
 3. M. Wilhelm and M. Stuber, **EAGO.jl Easy Advanced Global Optimization in Julia**, *Optimization Methods and Software*, vol. 37, no. 2, pp. 425-450, 2022.
+
