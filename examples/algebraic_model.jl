@@ -123,7 +123,7 @@ end
 @mtkcompile s = ReactorSeparatorRecycle()
 
 # Symbolic expressions of constraints and objective
-# Use syntax System.Component.Stream.Variable, System.Component.Stream.Parameter, or System.Component.Parameter
+# Use syntax System.Component.Connector.Variable, System.Component.Component.Parameter, or System.Component.Parameter
 exprF5 = s.sep2.outV.F
 exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
 f_CSTR = (25764 + 8178*s.cstr.V)/2.5
@@ -146,3 +146,21 @@ register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
 JuMP.value.(x)
 full_solutions(model, s)
+println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
+println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
+println("f^* = $(round(JuMP.objective_value(model),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
+
+# Unsimplified model
+@named fs = ReactorSeparatorRecycle()
+decision_vars(fs)
+fmodel = Model(EAGO.Optimizer)
+xL = zeros(50)
+xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
+@variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
+register_nlsystem(fmodel, fs, obj, [g1, g2])
+JuMP.optimize!(fmodel)
+println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
+println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
+println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
+println("x* = $(round.(JuMP.value.(x),digits=3)).")
