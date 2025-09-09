@@ -195,19 +195,3 @@ println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_
 println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
 println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
 println("x* = $(round.(JuMP.value.(x),digits=3)).")
-
-using MadNLP
-# Reduced model w/ EAGO
-@mtkcompile s = ReactorSeparatorRecycle()
-decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
-model = Model(()->MadNLP.Optimizer(print_level=MadNLP.INFO, max_iter=100))
-xL = zeros(6)
-xU = [100, 1, 1, 1, 100, 10]
-@variable(model, xL[i] <= x[i=1:6] <= xU[i])
-register_nlsystem(model, s, obj, [g1, g2])
-JuMP.optimize!(model)
-full_solutions(model, s)
-println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
