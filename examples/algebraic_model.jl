@@ -14,7 +14,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
         V_C = 1.13e-1
     end
 end
-@mtkmodel Influent begin
+@mtkmodel Feed begin
     @components begin
         out = Stream()
     end
@@ -105,14 +105,14 @@ end
 end
 @mtkmodel ReactorSeparatorRecycle begin
     @components begin
-        influent = Influent()
+        feed = Feed()
         mixer = Mixer()
         cstr = CSTR()
         sep1 = Separator1()
         sep2 = Separator2()
     end
     @equations begin
-        connect(influent.out, mixer.in1)
+        connect(feed.out, mixer.in1)
         connect(mixer.out, cstr.in)
         connect(cstr.out, sep1.in)
         connect(sep1.outV, mixer.in2)
@@ -139,8 +139,8 @@ obj = f_CSTR + f_Sep
 using Ipopt
 # Reduced model w/ Ipopt
 @mtkcompile s = ReactorSeparatorRecycle()
-decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
-model = Model(Ipopt.Optimizer)
+decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), feed₊F, cstr₊V
+model = Model(optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6))
 xL = zeros(6)
 xU = [100, 1, 1, 1, 100, 10]
 @variable(model, xL[i] <= x[i=1:6] <= xU[i])
@@ -148,29 +148,29 @@ register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
 full_solutions(model, s)
 println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(model),digits=6))")
+println("f^* = $(round(JuMP.objective_value(model),digits=6))")
+println("x* = $(round.(JuMP.value.(x),digits=5)).")
 
 # Unsimplified model w/ Ipopt
 @named fs = ReactorSeparatorRecycle()
 decision_vars(fs)
-fmodel = Model(Ipopt.Optimizer)
+fmodel = Model(optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6))
 xL = zeros(50)
 xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
 @variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
 register_nlsystem(fmodel, fs, obj, [g1, g2])
 JuMP.optimize!(fmodel)
 println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
-println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
-println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(fmodel),digits=6))")
+println("f^* = $(round(JuMP.objective_value(fmodel),digits=6))")
+println("x* = $(round.(JuMP.value.(x),digits=5)).")
 
 using EAGO
 # Reduced model w/ EAGO
 @mtkcompile s = ReactorSeparatorRecycle()
-decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
-model = Model(EAGO.Optimizer)
+decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), feed₊F, cstr₊V
+model = Model(optimizer_with_attributes(EAGO.Optimizer, "relative_tolerance" => 1e-6))
 xL = zeros(6)
 xU = [100, 1, 1, 1, 100, 10]
 @variable(model, xL[i] <= x[i=1:6] <= xU[i])
@@ -178,20 +178,20 @@ register_nlsystem(model, s, obj, [g1, g2])
 JuMP.optimize!(model)
 full_solutions(model, s)
 println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(model),digits=6))")
+println("f^* = $(round(JuMP.objective_value(model),digits=6))")
+println("x* = $(round.(JuMP.value.(x),digits=5)).")
 
 # Unsimplified model w/ EAGO
 @named fs = ReactorSeparatorRecycle()
 decision_vars(fs)
-fmodel = Model(EAGO.Optimizer)
+fmodel = Model(optimizer_with_attributes(EAGO.Optimizer, "relative_tolerance" => 1e-6))
 xL = zeros(50)
 xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
 @variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
 register_nlsystem(fmodel, fs, obj, [g1, g2])
 JuMP.optimize!(fmodel)
 println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
-println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
-println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(fmodel),digits=6))")
+println("f^* = $(round(JuMP.objective_value(fmodel),digits=6))")
+println("x* = $(round.(JuMP.value.(x),digits=5)).")
