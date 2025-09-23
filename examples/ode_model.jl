@@ -42,27 +42,27 @@ intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 using Ipopt
 @mtkcompile o = KineticParameterEstimation()
-model = Model(Ipopt.Optimizer)
+model = Model(optimizer_with_attributes(Ipopt.Optimizer, "tol" => 1e-6))
 decision_vars(o) # Displays: x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4
 # FIRST, create discretized state decision variables
 N = Int(floor((tspan[2] - tspan[1])/tstep))+1
 V = length(unknowns(o))
-@variable(model, -75 <= z[1:V,1:N] <= 150.0 ) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
+@variable(model, 0 <= z[1:V,1:N] <= 150.0 ) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
 # SECOND, create free design decision variables
 pL = [10, 10, 0.001]
 pU = [1200, 1200, 40]
 @variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
-register_odesystem(model, o, tspan, tstep, "IE")
+register_odesystem(model, o, tspan, tstep, "EE")
 @objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
 JuMP.optimize!(model)
 println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("p* = $(round.(JuMP.value.(p),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(model),digits=6))")
+println("f^* = $(round(JuMP.objective_value(model),digits=6))")
+println("p* = $(round.(JuMP.value.(p),digits=5)).")
 
 using EAGO
 @mtkcompile o = KineticParameterEstimation()
-model = Model(EAGO.Optimizer)
+model = Model(optimizer_with_attributes(EAGO.Optimizer, "relative_tolerance" => 1e-6)) # NEED TO FIX HERE
 decision_vars(o) # Displays: x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4
 # FIRST, create discretized state decision variables
 N = Int(floor((tspan[2] - tspan[1])/tstep))+1
@@ -72,10 +72,10 @@ V = length(unknowns(o))
 pL = [10, 10, 0.001]
 pU = [1200, 1200, 40]
 @variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
-register_odesystem(model, o, tspan, tstep, "IE")
+register_odesystem(model, o, tspan, tstep, "EE")
 @objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
 JuMP.optimize!(model)
 println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("p* = $(round.(JuMP.value.(p),digits=3)).")
+println("TIME: $(round.(JuMP.solve_time(model),digits=6))")
+println("f^* = $(round(JuMP.objective_value(model),digits=6))")
+println("p* = $(round.(JuMP.value.(p),digits=5)).")
