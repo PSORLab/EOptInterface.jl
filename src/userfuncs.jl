@@ -70,7 +70,7 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
     ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))+1:end]
     xs = reshape(setdiff(JuMP.all_variables(model),ps), V, N)
     # extracting initial conditions from MTK ODESystem -> algebraic JuMP constraint for x[1:V,1]
-    JuMP.@constraint(model, xs[:,1] == [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))])
+    JuMP.fix.(xs[:,1], [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))], force=true)
     # formulating JuMP constraints of ode discretizations
     if integrator == "EE"
         JuMP.@constraint(model, [j in 1:V,i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]...,ps...))
@@ -105,3 +105,4 @@ function full_solutions(model::JuMP.Model, sys::ModelingToolkit.System)
     end
     return soln_dict
 end
+
