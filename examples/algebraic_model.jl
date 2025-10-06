@@ -136,6 +136,9 @@ g1 = 25 - exprF5
 g2 = 475/3600 - exprTau
 obj = f_CSTR + f_Sep
 
+##################################
+#  IPOPT EOI TESTS -> RUN THESE  #
+##################################
 using Ipopt
 # Reduced model w/ Ipopt
 @mtkcompile s = ReactorSeparatorRecycle()
@@ -166,6 +169,9 @@ println("TIME: $(round.(JuMP.solve_time(fmodel),digits=6))")
 println("f^* = $(round(JuMP.objective_value(fmodel),digits=6))")
 println("x* = $(round.(JuMP.value.(x),digits=5)).")
 
+#################################
+#  EAGO EOI TESTS -> RUN THESE  #
+#################################
 using EAGO
 # Reduced model w/ EAGO
 @mtkcompile s = ReactorSeparatorRecycle()
