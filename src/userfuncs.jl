@@ -104,4 +104,5 @@ function full_solutions(model::JuMP.Model, sys::ModelingToolkit.System)
         soln_dict[ModelingToolkit.observed(sys)[i].lhs] = rhsExpr
     end
     return soln_dict
+
 end
