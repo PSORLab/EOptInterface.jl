@@ -2,7 +2,7 @@
 
 julia_version = "1.11.6"
 manifest_format = "2.0"
-project_hash = "d0080f64742c06fc5393426da4076937228a75de"
+project_hash = "e48585172b8bb85071e589d6ef00f65a9cf84c94"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "60665b326b75db6517939d0e1875850bc4a54368"
@@ -745,6 +745,18 @@ deps = ["ArnoldiMethod", "DataStructures", "Distributed", "Inflate", "LinearAlge
 git-tree-sha1 = "7a98c6502f4632dbe9fb1973a4244eaa3324e84d"
 uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
 version = "1.13.1"
+
+[[deps.Gurobi]]
+deps = ["Gurobi_jll", "Libdl", "MathOptInterface", "PrecompileTools"]
+git-tree-sha1 = "568d378f8ea0210cc2ce171865df393201018cb2"
+uuid = "2e9cd046-0924-5485-92f1-d5272153d98b"
+version = "1.7.6"
+
+[[deps.Gurobi_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7ceb74761498971196de2ba4000d5143384564ac"
+uuid = "c018c7e6-a5b0-4aea-8f80-9c1ef9991411"
+version = "12.0.3"
 
 [[deps.HashArrayMappedTries]]
 git-tree-sha1 = "2eaa69a7cab70a52b9687c8bf950a5a93ec895ae"
