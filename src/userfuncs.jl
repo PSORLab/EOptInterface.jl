@@ -47,13 +47,10 @@ Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by di
   - "IRK4"     : 2-stage Gauss–Legendre implicit RK (order 4)
   - "RADAU"|"RADAU5"|"RADAUIIA": 3-stage Radau IIA implicit RK (order 5)
   - "BDF"|"BDF2": BDF2 with IE startup
-  - "FBDF"     : Alias of BDF2 with IE startup (placeholder)
-  - "QNDF"     : Alias of BDF2 with IE startup (placeholder)
   - "RK5"|"DP5"|"DOPRI5": Dormand–Prince 5th-order explicit RK
   - "ROS2"|"ROS"|"Rosenbrock": 2-stage Rosenbrock–W method (linearly implicit, order 2)
   - "TSIT5"    : Tsitouras 5(4) explicit RK (7-stage, FSAL; step uses 6 stages)
   - "TRBDF2"   : 2-stage SDIRK approximation of TR-BDF2 (L-stable, order 2)
-  - "RODAS4P"|"RODAS5P": placeholders mapped to ROS2 (order-2 Rosenbrock)
 # Arguments
 - `model::Model`: the JuMP model
 - `sys::System`: the ModelingToolkit model
@@ -102,7 +99,7 @@ function register_odesystem(model::JuMP.Model,
 
     # Jacobian function for Rosenbrock methods (evaluated at x_i)
     Jfun = nothing
-    if intg in ("ROS2", "ROS", "ROSENBROCK", "RODAS4P", "RODAS5P", "RODAS4", "RODAS5")
+    if intg in ("ROS2", "ROS", "ROSENBROCK")
         J_expr = Symbolics.jacobian(dx_exprs, ModelingToolkit.unknowns(odesys))
         Jfun = build_function(J_expr, decision_vars(odesys, p_disc)...; expression = Val{false})
     end
@@ -340,12 +337,7 @@ function register_odesystem(model::JuMP.Model,
                 JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
             end
 
-        elseif intg == "BDF" || intg == "BDF2" || intg == "FBDF" || intg == "QNDF"
-            if intg == "FBDF"
-                @warn "Integrator FBDF: using BDF2 (with IE startup) as a placeholder."
-            elseif intg == "QNDF"
-                @warn "Integrator QNDF: using BDF2 (with IE startup) as a placeholder."
-            end
+        elseif intg == "BDF" || intg == "BDF2"
             if i == 1
                 for j in 1:V
                     JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., p_args_i...))
@@ -358,12 +350,8 @@ function register_odesystem(model::JuMP.Model,
                 end
             end
 
-        elseif intg == "ROS2" || intg == "ROS" || intg == "ROSENBROCK" ||
-               intg == "RODAS4P" || intg == "RODAS5P" || intg == "RODAS4" || intg == "RODAS5"
+        elseif intg == "ROS2" || intg == "ROS" || intg == "ROSENBROCK"
             # Rosenbrock–W method (order 2, 2 stages), Jacobian frozen at x_i
-            if intg != "ROS2" && intg != "ROS" && intg != "ROSENBROCK"
-                @warn "Integrator $(integrator): using ROS2 (order-2 Rosenbrock) as a placeholder."
-            end
             @assert Jfun !== nothing "Jacobian function not built"
             Ji = Jfun(xs[:, i]..., p_args_i...)  # V×V matrix (expressions)
 
@@ -399,7 +387,7 @@ function register_odesystem(model::JuMP.Model,
             end
 
         else
-            error("Available integrators: EE, IE, RK4, IRK4 (Gauss–Legendre 2-stage), RADAU (Radau IIA 3-stage), BDF (BDF2 with IE startup), FBDF (alias -> BDF2), QNDF (alias -> BDF2), RK5 (Dormand–Prince), TSIT5 (Tsitouras 5), TRBDF2 (SDIRK2), ROS2 (Rosenbrock–W), RODAS4P/RODAS5P (placeholders -> ROS2)")
+            error("Available integrators: EE, IE, RK4, IRK4 (Gauss–Legendre 2-stage), RADAU (Radau IIA 3-stage), BDF (BDF2 with IE startup), RK5 (Dormand–Prince), TSIT5 (Tsitouras 5), TRBDF2 (SDIRK2), ROS2/ROS/ROSENBROCK (Rosenbrock–W order 2)")
         end
     end
 end
