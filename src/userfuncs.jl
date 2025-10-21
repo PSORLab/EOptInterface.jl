@@ -67,13 +67,11 @@ function register_odesystem(model::JuMP.Model,
                             p_disc_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
                             x_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
                             fallback_map::Dict{Num,Real}=Dict(),
-                            pure_time_inputs::Dict{Num,Function}=Dict(),  # ← 新增
-                            t0::Real = nothing)
+                            t_map::Dict{SymbolicUtils.BasicSymbolic{Real},JuMP.VariableRef}=Dict())
 
     # Time grid and dimensions
     N = Int(floor((tspan[2] - tspan[1]) / tstep)) + 1
-    times = (t0 .+ (0:N-1) .* tstep)               # ← 新增
-    pure_syms = collect(keys(pure_time_inputs))    # ← 新增
+    # State variable dimensions
     V = length(ModelingToolkit.unknowns(odesys))
 
     # Normalize integrator key
@@ -87,9 +85,9 @@ function register_odesystem(model::JuMP.Model,
     for p in p_disc
         pop!(param_dict, p, nothing)
     end
-    for s in pure_syms
-        pop!(param_dict, s, nothing)
-    end
+
+    t_MTK = ModelingToolkit.get_iv(odesys)
+    t_at(i::Int, c::Real=0.0) = t_map[t_MTK] + (i-1 + c) * tstep
 
     dx = Vector{Function}(undef, V)
     dx_exprs = Vector{Symbolics.Num}(undef, V)
@@ -101,15 +99,15 @@ function register_odesystem(model::JuMP.Model,
         end
         dx_exprs[j] = dxj_expr
         dx[j] = build_function(dxj_expr,
-                            decision_vars(odesys, vcat(p_disc, pure_syms))...;
-                            expression = Val{false})
+                            decision_vars(odesys, p_disc)..., t_MTK;
+                            expression = Val(false))
     end
 
     # Jacobian function for Rosenbrock methods (evaluated at x_i)
     Jfun = nothing
     if intg in ("ROS2", "ROS", "ROSENBROCK")
         J_expr = Symbolics.jacobian(dx_exprs, ModelingToolkit.unknowns(odesys))
-        Jfun = build_function(J_expr, decision_vars(odesys, p_disc)...; expression = Val{false})
+        Jfun = build_function(J_expr, decision_vars(odesys, p_disc)..., t_MTK; expression = Val{false})
     end
 
     # 2) Validate discretized parameter arrays
@@ -135,8 +133,8 @@ function register_odesystem(model::JuMP.Model,
 
     # 4) Initial-condition constraints
     dflt = ModelingToolkit.defaults(odesys)
-
-    ivals = [ get(dflt, u) do
+    
+    ivals = [get(dflt, u) do
                 get(fallback_map, u) do
                     error("No initial value for $u")
                 end
@@ -146,35 +144,31 @@ function register_odesystem(model::JuMP.Model,
         # println("Initial condition for $(unknowns[j]): $(ivals[j])")
         JuMP.@constraint(model, xs[j, 1] == ivals[j])
     end
-    println(V)
-    println(xs[102, :])
     # 5) ODE discretization constraints
     for i in 1:(N-1)
         p_args_i   = [p_disc_vars[p][i] for p in p_disc]
-        p_pure_i   = [pure_time_inputs[s](times[i]) for s in pure_syms]   # ← 新增
 
         if intg == "EE"
             for j in 1:V
-                println(j)
-                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i]..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i]..., p_args_i..., t_at(i)))
             end
 
         elseif intg == "IE" || intg == "BDF1"
             for j in 1:V
-                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0)))
             end
 
         elseif intg == "RK4"
-            k1 = [dx[j](xs[:, i]..., p_args_i..., p_pure_i...) for j in 1:V]
+            k1 = [dx[j](xs[:, i]..., p_args_i..., t_at(i)) for j in 1:V]
             xk1_half = [xs[j, i] + 0.5 * tstep * k1[j] for j in 1:V]
 
-            k2 = [dx[j](xk1_half..., p_args_i..., p_pure_i...) for j in 1:V]
+            k2 = [dx[j](xk1_half..., p_args_i..., t_at(i, c=0.5)) for j in 1:V]
             xk2_half = [xs[j, i] + 0.5 * tstep * k2[j] for j in 1:V]
 
-            k3 = [dx[j](xk2_half..., p_args_i..., p_pure_i...) for j in 1:V]
+            k3 = [dx[j](xk2_half..., p_args_i..., t_at(i, c=0.5)) for j in 1:V]
             xk3_full = [xs[j, i] + tstep * k3[j] for j in 1:V]
 
-            k4 = [dx[j](xk3_full..., p_args_i..., p_pure_i...) for j in 1:V]
+            k4 = [dx[j](xk3_full..., p_args_i..., t_at(i, c=1.0)) for j in 1:V]
 
             for j in 1:V
                 JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + (tstep/6) * (k1[j] + 2*k2[j] + 2*k3[j] + k4[j]))
@@ -205,25 +199,25 @@ function register_odesystem(model::JuMP.Model,
             # b (5th order)
             b1 = 35//384; b2 = 0//1; b3 = 500//1113; b4 = 125//192; b5 = -2187//6784; b6 = 11//84; b7 = 0//1
 
-            k1 = [dx[j](xs[:, i]..., p_args_i..., p_pure_i...) for j in 1:V]
+            k1 = [dx[j](xs[:, i]..., p_args_i..., t_at(i)) for j in 1:V]
 
             y2 = [xs[j, i] + tstep*(a21*k1[j]) for j in 1:V]
-            k2 = [dx[j](y2..., p_args_i..., p_pure_i...) for j in 1:V]
+            k2 = [dx[j](y2..., p_args_i..., t_at(i, c=c2)) for j in 1:V]
 
             y3 = [xs[j, i] + tstep*(a31*k1[j] + a32*k2[j]) for j in 1:V]
-            k3 = [dx[j](y3..., p_args_i..., p_pure_i...) for j in 1:V]
+            k3 = [dx[j](y3..., p_args_i..., t_at(i, c=c3)) for j in 1:V]
 
             y4 = [xs[j, i] + tstep*(a41*k1[j] + a42*k2[j] + a43*k3[j]) for j in 1:V]
-            k4 = [dx[j](y4..., p_args_i..., p_pure_i...) for j in 1:V]
+            k4 = [dx[j](y4..., p_args_i..., t_at(i, c=c4)) for j in 1:V]
 
             y5 = [xs[j, i] + tstep*(a51*k1[j] + a52*k2[j] + a53*k3[j] + a54*k4[j]) for j in 1:V]
-            k5 = [dx[j](y5..., p_args_i..., p_pure_i...) for j in 1:V]
+            k5 = [dx[j](y5..., p_args_i..., t_at(i, c=c5)) for j in 1:V]
 
             y6 = [xs[j, i] + tstep*(a61*k1[j] + a62*k2[j] + a63*k3[j] + a64*k4[j] + a65*k5[j]) for j in 1:V]
-            k6 = [dx[j](y6..., p_args_i..., p_pure_i...) for j in 1:V]
+            k6 = [dx[j](y6..., p_args_i..., t_at(i, c=c6)) for j in 1:V]
 
             y7 = [xs[j, i] + tstep*(a71*k1[j] + a72*k2[j] + a73*k3[j] + a74*k4[j] + a75*k5[j] + a76*k6[j]) for j in 1:V]
-            k7 = [dx[j](y7..., p_args_i..., p_pure_i...) for j in 1:V]
+            k7 = [dx[j](y7..., p_args_i..., t_at(i, c=c7)) for j in 1:V]
 
             for j in 1:V
                 JuMP.@constraint(model,
@@ -233,22 +227,22 @@ function register_odesystem(model::JuMP.Model,
 
         elseif intg == "TSIT5"
             # Tsitouras 5(4) explicit RK (7 stages, FSAL). Step uses 6 stages.
-            k1 = [dx[j](xs[:, i]..., p_args_i..., p_pure_i...) for j in 1:V]
+            k1 = [dx[j](xs[:, i]..., p_args_i..., t_at(i)) for j in 1:V]
 
             y2 = [xs[j, i] + tstep*(0.1610000000000000*k1[j]) for j in 1:V]
-            k2 = [dx[j](y2..., p_args_i..., p_pure_i...) for j in 1:V]
+            k2 = [dx[j](y2..., p_args_i..., t_at(i, c=0.1610000000000000)) for j in 1:V]
 
             y3 = [xs[j, i] + tstep*(-0.008480655492356989*k1[j] + 0.3354806554923570*k2[j]) for j in 1:V]
-            k3 = [dx[j](y3..., p_args_i..., p_pure_i...) for j in 1:V]
+            k3 = [dx[j](y3..., p_args_i..., t_at(i, c=0.3270000000000000)) for j in 1:V]
 
             y4 = [xs[j, i] + tstep*(2.8971530571054935*k1[j] - 6.3594484899750750*k2[j] + 4.3622954328695815*k3[j]) for j in 1:V]
-            k4 = [dx[j](y4..., p_args_i..., p_pure_i...) for j in 1:V]
+            k4 = [dx[j](y4..., p_args_i..., t_at(i, c=0.9)) for j in 1:V]
 
             y5 = [xs[j, i] + tstep*(5.3258648284392570*k1[j] -11.7488835640628280*k2[j] + 7.4955393428898365*k3[j] -0.09249506636175525*k4[j]) for j in 1:V]
-            k5 = [dx[j](y5..., p_args_i..., p_pure_i...) for j in 1:V]
+            k5 = [dx[j](y5..., p_args_i..., t_at(i, c=1.0)) for j in 1:V]
 
             y6 = [xs[j, i] + tstep*(5.8614554429464200*k1[j] -12.9209693178471100*k2[j] + 8.1593678985761590*k3[j] -0.07158497328140100*k4[j] -0.02826905039406838*k5[j]) for j in 1:V]
-            k6 = [dx[j](y6..., p_args_i..., p_pure_i...) for j in 1:V]
+            k6 = [dx[j](y6..., p_args_i..., t_at(i, c=1.0)) for j in 1:V]
 
             # Update uses a7 row (FSAL): y_{i+1} = y_i + h*sum(a7j * kj, j=1..6)
             for j in 1:V
@@ -274,12 +268,12 @@ function register_odesystem(model::JuMP.Model,
 
             y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=c1)))
             end
 
             y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=c2)))
             end
 
             for j in 1:V
@@ -314,17 +308,17 @@ function register_odesystem(model::JuMP.Model,
 
             y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2] + a13*ks[j,3]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=_c1)))
             end
 
             y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2] + a23*ks[j,3]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=_c2)))
             end
 
             y3 = [xs[j, i] + tstep*(a31*ks[j,1] + a32*ks[j,2] + a33*ks[j,3]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,3] == dx[j](y3..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,3] == dx[j](y3..., p_args_i..., t_at(i, c=_c3)))
             end
 
             for j in 1:V
@@ -344,12 +338,12 @@ function register_odesystem(model::JuMP.Model,
 
             y1 = [xs[j, i] + tstep*(a11*ks[j,1]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=γ)))
             end
 
             y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
             for j in 1:V
-                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., p_pure_i...))
+                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=1.0)))
             end
 
             for j in 1:V
@@ -359,20 +353,19 @@ function register_odesystem(model::JuMP.Model,
         elseif intg == "BDF" || intg == "BDF2"
             if i == 1
                 for j in 1:V
-                    JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., p_args_i..., p_pure_i...))
+                    JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0)))
                 end
             else
                 for j in 1:V
                     JuMP.@constraint(model,
-                        xs[j, i+1] == (4/3) * xs[j, i] - (1/3) * xs[j, i-1] + (2/3) * tstep * dx[j](xs[:, i+1]..., p_args_i..., p_pure_i...)
-                    )
+                        xs[j, i+1] == (4/3) * xs[j, i] - (1/3) * xs[j, i-1] + (2/3) * tstep * dx[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0)))
                 end
             end
 
         elseif intg == "ROS2" || intg == "ROS" || intg == "ROSENBROCK"
             # Rosenbrock–W method (order 2, 2 stages), Jacobian frozen at x_i
             @assert Jfun !== nothing "Jacobian function not built"
-            Ji = Jfun(xs[:, i]..., p_args_i...)  # V×V matrix (expressions)
+            Ji = Jfun(xs[:, i]..., p_args_i..., t_at(i, c=0.0))  # V×V matrix (expressions)
 
             γ = 1 - 1/sqrt(2)
             a21 = 1.0
@@ -383,7 +376,7 @@ function register_odesystem(model::JuMP.Model,
             ks = JuMP.@variable(model, [1:V, 1:2])
 
             # Stage 1: (I - γ h J) k1 = h f(x_i)
-            f1 = [dx[j](xs[:, i]..., p_args_i..., p_pure_i...) for j in 1:V]
+            f1 = [dx[j](xs[:, i]..., p_args_i..., t_at(i, c=0.0)) for j in 1:V]
             for j in 1:V
                 JuMP.@constraint(model,
                     ks[j,1] - γ*tstep*sum(Ji[j,m] * ks[m,1] for m in 1:V) == tstep * f1[j]
@@ -392,7 +385,7 @@ function register_odesystem(model::JuMP.Model,
 
             # Stage 2: (I - γ h J) k2 = h f(x_i + a21*k1) + h J (c21*k1)
             y2 = [xs[j, i] + a21*ks[j,1] for j in 1:V]
-            f2 = [dx[j](y2..., p_args_i..., p_pure_i...) for j in 1:V]
+            f2 = [dx[j](y2..., p_args_i..., t_at(i, c=1.0)) for j in 1:V]
             for j in 1:V
                 JuMP.@constraint(model,
                     ks[j,2] - γ*tstep*sum(Ji[j,m] * ks[m,2] for m in 1:V) ==
