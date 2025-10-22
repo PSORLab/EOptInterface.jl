@@ -87,7 +87,7 @@ function register_odesystem(model::JuMP.Model,
     end
 
     t_MTK = ModelingToolkit.get_iv(odesys)
-    t_at(i::Int, c::Real=0.0) = t_map[t_MTK] + (i-1 + c) * tstep
+    t_at(i::Int; c::Real=0.0) = t_map[t_MTK] + (i-1 + c) * tstep
 
     dx = Vector{Function}(undef, V)
     dx_exprs = Vector{Symbolics.Num}(undef, V)
