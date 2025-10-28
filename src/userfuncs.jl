@@ -36,6 +36,103 @@ function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::
 end
 
 """
+Ensure/override initial conditions at the first stage.
+- model: JuMP.Model
+- odesys: MTK system (for defaults)
+- x_vars: Dict{Num,Vector{VariableRef}}  # state -> trajectory vars
+- override_map: Dict{Num,<:Real}         # 优先使用的初值，键必须是同一个 u(t)
+"""
+# function ensure_ic!(model, odesys, x_vars; override_map=Dict{Num,Float64}())
+#     dflt = ModelingToolkit.defaults(odesys)  # MTK 默认初值
+#     unknowns = collect(keys(x_vars))         # 和 register 的同一批未知量
+
+#     for u in unknowns
+#         # 1) 取值优先级：override_map → defaults → 报错
+#         v0 = if haskey(override_map, u)
+#             float(override_map[u])
+#         elseif haskey(dflt, u)
+#             float(dflt[u])
+#         else
+#             error("No initial value for $u (not in override_map and no default).")
+#         end
+
+#         # 2) 取 t=1 的 JuMP 变量
+#         x1 = x_vars[u][1]
+
+#         # 3) 覆盖或新建等式约束
+#         try
+#             JuMP.set_normalized_rhs(x1, v0)     # 覆盖已有的 x1 == ...
+#         catch
+#             # println("No constraint for $x1; adding new constraint.")
+#             @constraint(model, x1 == v0)        # 尚未建约束 → 新建
+#         end
+#     end
+#     return nothing
+# end
+
+# ---- 放在文件顶部合适位置：一个小工具 ----
+function ensure_ic!(model::JuMP.Model,
+                    ic_map::Dict{Any, JuMP.ConstraintRef},
+                    x_vars::Dict, u, val)
+    if haskey(ic_map, u)
+        # 这一步“就地改右端”，不会新增第二条约束
+        JuMP.set_normalized_rhs(ic_map[u], val)
+    else
+        con = @constraint(model, x_vars[u][1] == val)
+        ic_map[u] = con
+    end
+    return nothing
+end
+
+function to_num_key_map(u0_dict)
+    # u0_dict :: Dict{BasicSymbolic{Real}, Float64}
+    # 返回 :: Dict{Num, Float64}
+    Dict( Num(k) => v for (k,v) in u0_dict )
+end
+
+# Ensures there is exactly one scalar-equality IC constraint for x[idx].
+# If none is found and rhs_if_missing is provided, adds one.
+# If more than one is found, deletes duplicates to keep the first.
+function get_ic_constraint!(model::JuMP.Model,
+                            x::AbstractVector{<:JuMP.VariableRef};
+                            idx::Int=1,
+                            rhs_if_missing::Union{Nothing,Float64}=nothing)
+    @assert 1 <= idx <= length(x) "idx out of bounds"
+    target = x[idx]
+    target_idx = JuMP.index(target)
+
+    hits = JuMP.ConstraintRef[]
+    for c in JuMP.all_constraints(model, JuMP.AffExpr, MOI.EqualTo{Float64})
+        co = JuMP.constraint_object(c)
+        terms = co.func.terms
+        # Support both dict-like and vector-like term storage (JuMP version differences).
+        if length(terms) == 1
+            v = begin
+                if terms isa AbstractDict
+                    first(keys(terms))
+                else
+                    first(terms).first
+                end
+            end
+            if JuMP.index(v) == target_idx
+                push!(hits, c)
+            end
+        end
+    end
+
+    if isempty(hits)
+        isnothing(rhs_if_missing) && error("No scalar IC equality found for $(JuMP.name(target))")
+        return @constraint(model, target == rhs_if_missing)
+    end
+
+    # Keep only one IC constraint; remove duplicates (helps avoid overconstraining).
+    for c in hits[2:end]
+        JuMP.delete(model, c)
+    end
+    return first(hits)
+end
+
+"""
     register_odesystem(model, sys, tspan, tstep, integrator)
 
 Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by discretizing ODEs as a system of algebraic equations.
@@ -58,6 +155,7 @@ Registers a ModelingToolkit dynamic model as algebraic constraints in JuMP by di
 - `tstep::Number`: the time step used in the integration scheme
 - `integrator::String`: integration scheme used in discretization (see list above)
 """
+
 function register_odesystem(model::JuMP.Model,
                             odesys::ModelingToolkit.System,
                             tspan::Tuple{Real,Real},
@@ -66,7 +164,10 @@ function register_odesystem(model::JuMP.Model,
                             p_disc::Vector{Num}=Num[],
                             p_disc_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
                             x_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
-                            fallback_map::Dict{Num,Real}=Dict(),
+                            override_map::Union{
+                                Dict{Num, Real},
+                                Dict{SymbolicUtils.BasicSymbolic{Real}, Float64}
+                            } = Dict{Num, Real}(),
                             t_map::Dict{SymbolicUtils.BasicSymbolic{Real},JuMP.VariableRef}=Dict())
 
     # Time grid and dimensions
@@ -132,18 +233,55 @@ function register_odesystem(model::JuMP.Model,
     end
 
     # 4) Initial-condition constraints
-    dflt = ModelingToolkit.defaults(odesys)
-    
-    ivals = [get(dflt, u) do
-                get(fallback_map, u) do
-                    error("No initial value for $u")
-                end
-            end
-            for u in unknowns ]
-    for j in 1:V
-        # println("Initial condition for $(unknowns[j]): $(ivals[j])")
-        JuMP.@constraint(model, xs[j, 1] == ivals[j])
+    # # 取回在 build_state_trajs_from_vars! 里登记过的句柄
+    # x_vars = get(model.ext, :x_vars, nothing)
+    # ic_map = get(model.ext, :ic_map, nothing)
+    # x_vars === nothing && error("x_vars not found in model.ext — call build_state_trajs_from_vars! first.")
+    # ic_map === nothing && error("ic_map not found in model.ext — call build_state_trajs_from_vars! first.")
+
+    # # 把 BasicSymbolic 键的 u0_dict 统一成 Num 键
+    # override_map_num = to_num_key_map(override_map)
+    # # 一个稳健的“只保留一条 IC 等式”的获取函数（你已经有 get_ic_constraint!，直接用它更好）
+    # get_ic = get_ic_constraint!  # 你 utilities 里写的那个
+
+    # for v in unknowns  # v 是 MTK 的 Num（和 x_vars 的键同型）
+    #     y = x_vars[v]                        # y::Vector{VariableRef}
+    #     cref = get_ic(model, y; idx=1, rhs_if_missing=0.0)  # 拿到“唯一的” y[1]==... 这条
+    #     rhs = get(override_map_num, v, nothing)
+    #     isnothing(rhs) && error("No initial value found for $(v)")
+    #     JuMP.set_normalized_rhs(cref, rhs)   # 只改 RHS，不再新建第二条
+    # end
+    # 这里假设你已经有 unknowns::Vector{Num}，并且 x_vars::Dict{Num, Vector{VariableRef}}
+
+    # 传进来了（函数签名里已经有 x_vars; 若为空说明调用方还没建轨迹变量）
+
+    # 1) 拿到/准备一份“y1 -> 约束句柄”的表；以后只用它来改 RHS
+    ic_map = get!(model.ext, :ic_map, Dict{JuMP.VariableRef, JuMP.ConstraintRef}())
+
+    # 2) 把外部传入的 override_map（可能是 BasicSymbolic 键）统一成 Num 键
+    override_num = to_num_key_map(override_map)
+
+    # 3) 逐个 unknown 覆盖 y[1] 的 RHS：
+    for v in unknowns              # v 是 MTK 的 Num
+        # 找到该状态离散轨迹的第一个点（y[1]）
+        y = get(x_vars, v, nothing)
+        y === nothing && error("x_vars does not contain trajectory for $(v). " *
+                            "Make sure you built trajectories before calling register_odesystem.")
+        y1 = y[1]::JuMP.VariableRef
+
+        # 拿到该变量的初值
+        rhs = get(override_num, v, nothing)
+        isnothing(rhs) && error("No initial value provided for $(v) in override_map.")
+
+        # 如果我们之前已经为 y1 建过“IC 等式”，就只改 RHS；否则现在建一条并记录句柄
+        if haskey(ic_map, y1)
+            JuMP.set_normalized_rhs(ic_map[y1], rhs)
+        else
+            ic_map[y1] = @constraint(model, y1 == rhs)
+        end
     end
+
+
     # 5) ODE discretization constraints
     for i in 1:(N-1)
         p_args_i   = [p_disc_vars[p][i] for p in p_disc]
@@ -254,32 +392,79 @@ function register_odesystem(model::JuMP.Model,
             end
 
         elseif intg == "IRK4"
-            # Implicit RK order 4 (2-stage Gauss–Legendre)
+            # # Implicit RK order 4 (2-stage Gauss–Legendre)
+            # c1 = 0.5 - sqrt(3)/6
+            # c2 = 0.5 + sqrt(3)/6
+            # a11 = 1/4
+            # a12 = 1/4 - sqrt(3)/6
+            # a21 = 1/4 + sqrt(3)/6
+            # a22 = 1/4
+            # b1 = 1/2
+            # b2 = 1/2
+
+            # ks = JuMP.@variable(model, [1:V, 1:2])
+
+            # y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2]) for j in 1:V]
+            # for j in 1:V
+            #     JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=c1)))
+            # end
+
+            # y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
+            # for j in 1:V
+            #     JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=c2)))
+            # end
+
+            # for j in 1:V
+            #     JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
+            # end
+            # === IRK4 (Gauss-Legendre 2-stage) ===
             c1 = 0.5 - sqrt(3)/6
             c2 = 0.5 + sqrt(3)/6
-            a11 = 1/4
-            a12 = 1/4 - sqrt(3)/6
-            a21 = 1/4 + sqrt(3)/6
-            a22 = 1/4
-            b1 = 1/2
-            b2 = 1/2
+            a11 = 1/4; a12 = 1/4 - sqrt(3)/6
+            a21 = 1/4 + sqrt(3)/6; a22 = 1/4
+            b1  = 1/2; b2  = 1/2
 
-            ks = JuMP.@variable(model, [1:V, 1:2])
+            for i in 1:N
+                # 1) 显式建阶段状态变量，避免把大表达式直接塞进 f(·)
+                @variable(model, y1[1:V])
+                @variable(model, y2[1:V])
 
-            y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2]) for j in 1:V]
-            for j in 1:V
-                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=c1)))
+                # 2) 阶段导数变量
+                @variable(model, ks[1:V, 1:2])
+
+                # 3) 链接阶段状态与 k（纯线性，求解更稳）
+                @constraint(model, [j=1:V], y1[j] == xs[j,i] + tstep*(a11*ks[j,1] + a12*ks[j,2]))
+                @constraint(model, [j=1:V], y2[j] == xs[j,i] + tstep*(a21*ks[j,1] + a22*ks[j,2]))
+
+                # 阶段时间用“数值”，不要把 JuMP 变量当时间传进去
+                t1 = t0 + (i-1 + c1)*tstep
+                t2 = t0 + (i-1 + c2)*tstep
+
+                # 4) 给 k 合理的初值（用显式Euler做个热启动）
+                #    k0 ≈ f(xs[:,i], t_i)
+                t_i = t0 + (i-1)*tstep
+                p_args_i = (p_disc_vars === nothing) ? () : (p_disc_vars[i]...,)
+                k0 = similar(xs, V)
+                for j in 1:V
+                    # 若你有已经注册成 NL 的 f_j，可以用  value/计算得到数值初值；
+                    # 没有也行，给个保守常数起步
+                    k0[j] = 0.0
+                end
+                set_start_value.(ks[:,1], k0)
+                set_start_value.(ks[:,2], k0)
+                set_start_value.(y1, value.(xs[:,i]))
+                set_start_value.(y2, value.(xs[:,i]))
+
+                # 5) 阶段隐式方程（建议用 @NLconstraint；若你已把 dx[j] 注册成 JuMP 函数，就替换成它）
+                @NLconstraint(model, [j=1:V],
+                    ks[j,1] == dx_j(j, y1..., p_args_i..., t1) )
+                @NLconstraint(model, [j=1:V],
+                    ks[j,2] == dx_j(j, y2..., p_args_i..., t2) )
+
+                # 6) 主更新
+                @constraint(model, [j=1:V],
+                    xs[j, i+1] == xs[j,i] + tstep*(b1*ks[j,1] + b2*ks[j,2]) )
             end
-
-            y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
-            for j in 1:V
-                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=c2)))
-            end
-
-            for j in 1:V
-                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
-            end
-
         elseif intg == "RADAU" || intg == "RADAU5" || intg == "RADAUIIA"
             # 3-stage Radau IIA (order 5) implicit RK
             s6 = sqrt(6.0)
