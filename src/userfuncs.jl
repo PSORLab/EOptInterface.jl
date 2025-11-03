@@ -164,10 +164,6 @@ function register_odesystem(model::JuMP.Model,
                             p_disc::Vector{Num}=Num[],
                             p_disc_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
                             x_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
-                            override_map::Union{
-                                Dict{Num, Real},
-                                Dict{SymbolicUtils.BasicSymbolic{Real}, Float64}
-                            } = Dict{Num, Real}(),
                             t_map::Dict{SymbolicUtils.BasicSymbolic{Real},JuMP.VariableRef}=Dict())
 
     # Time grid and dimensions
@@ -230,55 +226,6 @@ function register_odesystem(model::JuMP.Model,
     else
         xs = reshape(setdiff(JuMP.all_variables(model), flat_pvars), V, N)
         @warn "register_odesystem: inferring state ordering from all_variables; pass x_vars=... to avoid mismatches."
-    end
-
-    # 4) Initial-condition constraints
-    # # 取回在 build_state_trajs_from_vars! 里登记过的句柄
-    # x_vars = get(model.ext, :x_vars, nothing)
-    # ic_map = get(model.ext, :ic_map, nothing)
-    # x_vars === nothing && error("x_vars not found in model.ext — call build_state_trajs_from_vars! first.")
-    # ic_map === nothing && error("ic_map not found in model.ext — call build_state_trajs_from_vars! first.")
-
-    # # 把 BasicSymbolic 键的 u0_dict 统一成 Num 键
-    # override_map_num = to_num_key_map(override_map)
-    # # 一个稳健的“只保留一条 IC 等式”的获取函数（你已经有 get_ic_constraint!，直接用它更好）
-    # get_ic = get_ic_constraint!  # 你 utilities 里写的那个
-
-    # for v in unknowns  # v 是 MTK 的 Num（和 x_vars 的键同型）
-    #     y = x_vars[v]                        # y::Vector{VariableRef}
-    #     cref = get_ic(model, y; idx=1, rhs_if_missing=0.0)  # 拿到“唯一的” y[1]==... 这条
-    #     rhs = get(override_map_num, v, nothing)
-    #     isnothing(rhs) && error("No initial value found for $(v)")
-    #     JuMP.set_normalized_rhs(cref, rhs)   # 只改 RHS，不再新建第二条
-    # end
-    # 这里假设你已经有 unknowns::Vector{Num}，并且 x_vars::Dict{Num, Vector{VariableRef}}
-
-    # 传进来了（函数签名里已经有 x_vars; 若为空说明调用方还没建轨迹变量）
-
-    # 1) 拿到/准备一份“y1 -> 约束句柄”的表；以后只用它来改 RHS
-    ic_map = get!(model.ext, :ic_map, Dict{JuMP.VariableRef, JuMP.ConstraintRef}())
-
-    # 2) 把外部传入的 override_map（可能是 BasicSymbolic 键）统一成 Num 键
-    override_num = to_num_key_map(override_map)
-
-    # 3) 逐个 unknown 覆盖 y[1] 的 RHS：
-    for v in unknowns              # v 是 MTK 的 Num
-        # 找到该状态离散轨迹的第一个点（y[1]）
-        y = get(x_vars, v, nothing)
-        y === nothing && error("x_vars does not contain trajectory for $(v). " *
-                            "Make sure you built trajectories before calling register_odesystem.")
-        y1 = y[1]::JuMP.VariableRef
-
-        # 拿到该变量的初值
-        rhs = get(override_num, v, nothing)
-        isnothing(rhs) && error("No initial value provided for $(v) in override_map.")
-
-        # 如果我们之前已经为 y1 建过“IC 等式”，就只改 RHS；否则现在建一条并记录句柄
-        if haskey(ic_map, y1)
-            JuMP.set_normalized_rhs(ic_map[y1], rhs)
-        else
-            ic_map[y1] = @constraint(model, y1 == rhs)
-        end
     end
 
 
