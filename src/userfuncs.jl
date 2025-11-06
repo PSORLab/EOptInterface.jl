@@ -184,6 +184,7 @@ function register_odesystem(model::JuMP.Model,
     end
 
     t_MTK = ModelingToolkit.get_iv(odesys)
+    t0 = t_MTK
     t_at(i::Int; c::Real=0.0) = t_map[t_MTK] + (i-1 + c) * tstep
 
     dx = Vector{Function}(undef, V)
@@ -339,79 +340,79 @@ function register_odesystem(model::JuMP.Model,
             end
 
         elseif intg == "IRK4"
-            # # Implicit RK order 4 (2-stage Gauss–Legendre)
-            # c1 = 0.5 - sqrt(3)/6
-            # c2 = 0.5 + sqrt(3)/6
-            # a11 = 1/4
-            # a12 = 1/4 - sqrt(3)/6
-            # a21 = 1/4 + sqrt(3)/6
-            # a22 = 1/4
-            # b1 = 1/2
-            # b2 = 1/2
-
-            # ks = JuMP.@variable(model, [1:V, 1:2])
-
-            # y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2]) for j in 1:V]
-            # for j in 1:V
-            #     JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=c1)))
-            # end
-
-            # y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
-            # for j in 1:V
-            #     JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=c2)))
-            # end
-
-            # for j in 1:V
-            #     JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
-            # end
-            # === IRK4 (Gauss-Legendre 2-stage) ===
+            # Implicit RK order 4 (2-stage Gauss–Legendre)
             c1 = 0.5 - sqrt(3)/6
             c2 = 0.5 + sqrt(3)/6
-            a11 = 1/4; a12 = 1/4 - sqrt(3)/6
-            a21 = 1/4 + sqrt(3)/6; a22 = 1/4
-            b1  = 1/2; b2  = 1/2
+            a11 = 1/4
+            a12 = 1/4 - sqrt(3)/6
+            a21 = 1/4 + sqrt(3)/6
+            a22 = 1/4
+            b1 = 1/2
+            b2 = 1/2
 
-            for i in 1:N
-                # 1) 显式建阶段状态变量，避免把大表达式直接塞进 f(·)
-                @variable(model, y1[1:V])
-                @variable(model, y2[1:V])
+            ks = JuMP.@variable(model, [1:V, 1:2])
 
-                # 2) 阶段导数变量
-                @variable(model, ks[1:V, 1:2])
-
-                # 3) 链接阶段状态与 k（纯线性，求解更稳）
-                @constraint(model, [j=1:V], y1[j] == xs[j,i] + tstep*(a11*ks[j,1] + a12*ks[j,2]))
-                @constraint(model, [j=1:V], y2[j] == xs[j,i] + tstep*(a21*ks[j,1] + a22*ks[j,2]))
-
-                # 阶段时间用“数值”，不要把 JuMP 变量当时间传进去
-                t1 = t0 + (i-1 + c1)*tstep
-                t2 = t0 + (i-1 + c2)*tstep
-
-                # 4) 给 k 合理的初值（用显式Euler做个热启动）
-                #    k0 ≈ f(xs[:,i], t_i)
-                t_i = t0 + (i-1)*tstep
-                p_args_i = (p_disc_vars === nothing) ? () : (p_disc_vars[i]...,)
-                k0 = similar(xs, V)
-                for j in 1:V
-                    # 若你有已经注册成 NL 的 f_j，可以用  value/计算得到数值初值；
-                    # 没有也行，给个保守常数起步
-                    k0[j] = 0.0
-                end
-                set_start_value.(ks[:,1], k0)
-                set_start_value.(ks[:,2], k0)
-                set_start_value.(y1, value.(xs[:,i]))
-                set_start_value.(y2, value.(xs[:,i]))
-
-                # 5) 阶段隐式方程（建议用 @NLconstraint；若你已把 dx[j] 注册成 JuMP 函数，就替换成它）
-                @NLconstraint(model, [j=1:V],
-                    ks[j,1] == dx_j(j, y1..., p_args_i..., t1) )
-                @NLconstraint(model, [j=1:V],
-                    ks[j,2] == dx_j(j, y2..., p_args_i..., t2) )
-
-                # 6) 主更新
-                @constraint(model, [j=1:V],
-                    xs[j, i+1] == xs[j,i] + tstep*(b1*ks[j,1] + b2*ks[j,2]) )
+            y1 = [xs[j, i] + tstep*(a11*ks[j,1] + a12*ks[j,2]) for j in 1:V]
+            for j in 1:V
+                JuMP.@constraint(model, ks[j,1] == dx[j](y1..., p_args_i..., t_at(i, c=c1)))
             end
+
+            y2 = [xs[j, i] + tstep*(a21*ks[j,1] + a22*ks[j,2]) for j in 1:V]
+            for j in 1:V
+                JuMP.@constraint(model, ks[j,2] == dx[j](y2..., p_args_i..., t_at(i, c=c2)))
+            end
+
+            for j in 1:V
+                JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
+            end
+            # === IRK4 (Gauss-Legendre 2-stage) ===
+            # c1 = 0.5 - sqrt(3)/6
+            # c2 = 0.5 + sqrt(3)/6
+            # a11 = 1/4; a12 = 1/4 - sqrt(3)/6
+            # a21 = 1/4 + sqrt(3)/6; a22 = 1/4
+            # b1  = 1/2; b2  = 1/2
+
+            # for i in 1:N
+            #     # 1) 显式建阶段状态变量，避免把大表达式直接塞进 f(·)
+            #     @variable(model, y1[1:V])
+            #     @variable(model, y2[1:V])
+
+            #     # 2) 阶段导数变量
+            #     @variable(model, ks[1:V, 1:2])
+
+            #     # 3) 链接阶段状态与 k（纯线性，求解更稳）
+            #     @constraint(model, [j=1:V], y1[j] == xs[j,i] + tstep*(a11*ks[j,1] + a12*ks[j,2]))
+            #     @constraint(model, [j=1:V], y2[j] == xs[j,i] + tstep*(a21*ks[j,1] + a22*ks[j,2]))
+
+            #     # 阶段时间用“数值”，不要把 JuMP 变量当时间传进去
+            #     t1 = t0 + (i-1 + c1)*tstep
+            #     t2 = t0 + (i-1 + c2)*tstep
+
+            #     # 4) 给 k 合理的初值（用显式Euler做个热启动）
+            #     #    k0 ≈ f(xs[:,i], t_i)
+            #     t_i = t0 + (i-1)*tstep
+            #     p_args_i = (p_disc_vars === nothing) ? () : (p_disc_vars[i]...,)
+            #     k0 = similar(xs, V)
+            #     for j in 1:V
+            #         # 若你有已经注册成 NL 的 f_j，可以用  value/计算得到数值初值；
+            #         # 没有也行，给个保守常数起步
+            #         k0[j] = 0.0
+            #     end
+            #     set_start_value.(ks[:,1], k0)
+            #     set_start_value.(ks[:,2], k0)
+            #     set_start_value.(y1, value.(xs[:,i]))
+            #     set_start_value.(y2, value.(xs[:,i]))
+
+            #     # 5) 阶段隐式方程（建议用 @NLconstraint；若你已把 dx[j] 注册成 JuMP 函数，就替换成它）
+            #     @NLconstraint(model, [j=1:V],
+            #         ks[j,1] == dx_j(j, y1..., p_args_i..., t1) )
+            #     @NLconstraint(model, [j=1:V],
+            #         ks[j,2] == dx_j(j, y2..., p_args_i..., t2) )
+
+            #     # 6) 主更新
+            #     @constraint(model, [j=1:V],
+            #         xs[j, i+1] == xs[j,i] + tstep*(b1*ks[j,1] + b2*ks[j,2]) )
+            # end
         elseif intg == "RADAU" || intg == "RADAU5" || intg == "RADAUIIA"
             # 3-stage Radau IIA (order 5) implicit RK
             s6 = sqrt(6.0)
