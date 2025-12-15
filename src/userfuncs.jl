@@ -560,3 +560,200 @@ function full_solutions(model::JuMP.Model, sys::ModelingToolkit.System; ps::Vect
     end
     return soln_dict
 end
+
+"""
+    register_daesystem(model, sys, tspan, tstep, integrator; ...)
+
+Register an index-1 DAE from ModelingToolkit into JuMP via direct transcription.
+
+Assumes equations are of the form:
+  D(x) ~ f(...)
+  0    ~ g(...)   or   z ~ h(...)
+
+Supported integrators for the differential part:
+  - "EE"    : Explicit Euler (usually not recommended for stiff ADM1)
+  - "IE"    : Implicit Euler (recommended first for ADM1 proof-of-concept)
+  - "BDF2"  : BDF2 with IE startup (often better for stiff systems)
+
+Algebraic equations are enforced as equality constraints at time nodes.
+"""
+function register_daesystem(model::JuMP.Model,
+                            sys::ModelingToolkit.System,
+                            tspan::Tuple{Real,Real},
+                            tstep::Real,
+                            integrator::String;
+                            p_disc::Vector{Num}=Num[],
+                            p_disc_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
+                            x_vars::Dict{Num,Vector{JuMP.VariableRef}}=Dict(),
+                            t_map::Dict{SymbolicUtils.BasicSymbolic{Real},JuMP.VariableRef}=Dict(),
+                            enforce_alg_at_t1::Bool=true)
+
+    # -----------------------------
+    # Time grid and dimensions
+    # -----------------------------
+    N = Int(floor((tspan[2] - tspan[1]) / tstep)) + 1
+    unknowns = ModelingToolkit.unknowns(sys)
+    V = length(unknowns)
+
+    intg = uppercase(integrator)
+    @assert intg in ("EE","IE","BDF2","BDF") "register_daesystem: integrator must be one of EE, IE, BDF2/BDF"
+
+    # If user didn't pass a time variable mapping, treat time as numeric.
+    t_MTK = ModelingToolkit.get_iv(sys)
+    t_base = haskey(t_map, t_MTK) ? t_map[t_MTK] : tspan[1]
+    t_at(i::Int; c::Real=0.0) = t_base + (i-1 + c) * tstep
+
+    # -----------------------------
+    # Substitute default params (except unknowns & discretized params)
+    # -----------------------------
+    param_dict = copy(ModelingToolkit.defaults(sys))
+    for u in unknowns
+        pop!(param_dict, u, nothing)
+    end
+    for p in p_disc
+        pop!(param_dict, p, nothing)
+    end
+    sub_defaults(expr) = begin
+        ex = expr
+        while !isempty(intersect(Symbolics.get_variables(ex), keys(param_dict)))
+            ex = SymbolicUtils.substitute(ex, param_dict)
+        end
+        ex
+    end
+
+    # -----------------------------
+    # Classify equations: differential vs algebraic
+    # -----------------------------
+    idx_of = Dict(u => i for (i,u) in enumerate(unknowns))
+    full_eqs = ModelingToolkit.full_equations(sys)
+
+    # differential: map var-index j -> f_j expression
+    f_expr = Dict{Int,Symbolics.Num}()
+
+    # algebraic: list of residual expressions r_k(x,z,p,t) == 0
+    alg_residuals = Symbolics.Num[]
+
+    is_diff_lhs(lhs) = begin
+        try
+            op = Symbolics.operation(lhs)
+            op isa ModelingToolkit.Differential
+        catch
+            false
+        end
+    end
+
+    diff_var(lhs) = Symbolics.arguments(lhs)[1]
+
+    for eq in full_eqs
+        lhs = eq.lhs
+        rhs = eq.rhs
+
+        if is_diff_lhs(lhs)
+            v = diff_var(lhs)
+            @assert haskey(idx_of, v) "DAE parse: differential var $v not in unknowns(sys)"
+            j = idx_of[v]
+            f_expr[j] = sub_defaults(rhs)
+        else
+            # algebraic residual: lhs - rhs == 0
+            push!(alg_residuals, sub_defaults(lhs - rhs))
+        end
+    end
+
+    diff_idx = sort(collect(keys(f_expr)))
+    @assert !isempty(diff_idx) "register_daesystem: no differential equations detected"
+    # It's OK if alg_residuals is empty => system was actually ODE after simplification.
+
+    # -----------------------------
+    # Build functions for f and g
+    # -----------------------------
+    # Inputs are decision_vars(sys,p_disc)..., t_MTK (matches your register_odesystem style)
+    dv = decision_vars(sys, p_disc)
+
+    f_fun = Dict{Int,Function}()
+    for j in diff_idx
+        f_fun[j] = build_function(f_expr[j], dv..., t_MTK; expression=Val(false))
+    end
+
+    g_fun = Function[]
+    for r in alg_residuals
+        push!(g_fun, build_function(r, dv..., t_MTK; expression=Val(false)))
+    end
+
+    # -----------------------------
+    # Validate discretized parameter arrays
+    # -----------------------------
+    for p in p_disc
+        @assert haskey(p_disc_vars, p) "Missing p_disc_vars[$p] for $p (should have length N)"
+        @assert length(p_disc_vars[p]) == N "p_disc_vars[$p] must have length N=$N"
+    end
+
+    flat_pvars = reduce(vcat, values(p_disc_vars); init=JuMP.VariableRef[])
+
+    # -----------------------------
+    # Build state matrix xs (V×N)
+    # -----------------------------
+    xs = Array{JuMP.VariableRef}(undef, V, N)
+    if !isempty(x_vars)
+        for (j, u) in enumerate(unknowns)
+            @assert haskey(x_vars, u) "Missing x_vars[$u]"
+            @assert length(x_vars[u]) == N "x_vars[$u] must have length N=$N"
+            xs[j, :] = x_vars[u]
+        end
+    else
+        xs = reshape(setdiff(JuMP.all_variables(model), flat_pvars), V, N)
+        @warn "register_daesystem: inferring state ordering from all_variables; pass x_vars=... to avoid mismatches."
+    end
+
+    # -----------------------------
+    # Differential discretization (only for diff_idx)
+    # -----------------------------
+    for i in 1:(N-1)
+        p_args_i = [p_disc_vars[p][i] for p in p_disc]
+
+        if intg == "EE"
+            for j in diff_idx
+                JuMP.@constraint(model,
+                    xs[j, i+1] == xs[j, i] + tstep * f_fun[j](xs[:, i]..., p_args_i..., t_at(i))
+                )
+            end
+
+        elseif intg == "IE"
+            for j in diff_idx
+                JuMP.@constraint(model,
+                    xs[j, i+1] == xs[j, i] + tstep * f_fun[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0))
+                )
+            end
+
+        elseif intg == "BDF2" || intg == "BDF"
+            if i == 1
+                for j in diff_idx
+                    JuMP.@constraint(model,
+                        xs[j, i+1] == xs[j, i] + tstep * f_fun[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0))
+                    )
+                end
+            else
+                for j in diff_idx
+                    JuMP.@constraint(model,
+                        xs[j, i+1] == (4/3) * xs[j, i] - (1/3) * xs[j, i-1] +
+                                     (2/3) * tstep * f_fun[j](xs[:, i+1]..., p_args_i..., t_at(i, c=1.0))
+                    )
+                end
+            end
+        end
+    end
+
+    # -----------------------------
+    # Algebraic constraints at nodes
+    # -----------------------------
+    if !isempty(g_fun)
+        k_start = enforce_alg_at_t1 ? 1 : 2
+        for k in k_start:N
+            p_args_k = [p_disc_vars[p][k] for p in p_disc]
+            for gg in g_fun
+                JuMP.@constraint(model, gg(xs[:, k]..., p_args_k..., t_at(k)) == 0)
+            end
+        end
+    end
+
+    return nothing
+end
