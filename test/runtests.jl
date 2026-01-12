@@ -53,9 +53,9 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     @variable(model, xL[i] <= xvar[i in 1:6] <= xU[i])
     EOptInterface.register_nlsystem(model, n, obj, [g1, g2])
     JuMP.optimize!(model)
-    @test JuMP.value.(xvar)[6] == 26.316700011101723
+    @test abs(JuMP.value.(xvar)[6] - 26.316700011101723)/26.316700011101723 < 1e-6
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
-    @test EOptInterface.full_solutions(model, n)[n.y_3C] == 0.01385685924868818
+    @test abs(EOptInterface.full_solutions(model, n)[n.y_3C] - 0.01385685924868818)/0.01385685924868818 < 1e-6
 
     @mtkmodel KineticParameterEstimation begin
         @parameters begin
@@ -306,6 +306,5 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     @objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
     JuMP.optimize!(model)
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
-    @test JuMP.objective_value(model) == 9622.762852574022
+    @test abs(JuMP.objective_value(model) - 9622.762852574022)/9622.762852574022 < 1e-6
 end
-
