@@ -146,34 +146,34 @@ obj = f_CSTR + f_Sep
 
 # Solve reduced-space model
 # Create JuMP model
-# model = Model(EAGO.Optimizer)
+model = Model(EAGO.Optimizer)
 
 # Retrieve decision variables from ModelingToolkit system
 # Returns [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t), influent₊F, cstr₊V]
-# decision_vars(system)
+decision_vars(system)
 
 # Create decision variables
 # z = [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t)]
 # p = [influent₊F, cstr₊V]
-# xL = zeros(6)
-# xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
-# @variable(model, xL[i] <= x[i=1:6] <= xU[i])
+xL = zeros(6)
+xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
+@variable(model, xL[i] <= x[i=1:6] <= xU[i])
 
 # Register ModelingToolkit nonlinear system as constraints and register objective
-# register_nlsystem(model, system, obj, [g1, g2])
+register_nlsystem(model, system, obj, [g1, g2])
 
 # Optimize model
-# JuMP.optimize!(model)
+JuMP.optimize!(model)
 
 # Display results
-# println("Termination Status: $(JuMP.termination_status(model))")
-# println("Primal Status: $(JuMP.primal_status(model))")
-# println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
-# println("f^* = $(round(JuMP.objective_value(model), digits=5))")
-# println("x* = $(round.(JuMP.value.(x), digits=3))")
+println("Termination Status: $(JuMP.termination_status(model))")
+println("Primal Status: $(JuMP.primal_status(model))")
+println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
+println("f^* = $(round(JuMP.objective_value(model), digits=5))")
+println("x* = $(round.(JuMP.value.(x), digits=3))")
 
 # Retrieve full-space solution
-# full_solution(model, system)
+full_solution(model, system)
 
 # Solve full-space model
 # Compile system
@@ -181,17 +181,10 @@ obj = f_CSTR + f_Sep
 
 # Create JuMP model
 full_model = Model(EAGO.Optimizer)
-set_optimizer_attribute(full_model, "cp_depth", 0)
-set_optimizer_attribute(full_model, "fbbt_lp_depth", 0)
-# set_optimizer_attribute(full_model, "obbt_depth", 0)
-set_optimizer_attribute(full_model, "iteration_limit", 40000)
 
 # Create decision variables
 xL = zeros(50)
-xL = vcat(repeat([0.0, 0.0, 0.0, 0.0], 12), 0.0, 0.0)
 xU = vcat(repeat([100.0, 1.0, 1.0, 1.0], 12), 100.0, 10.0)
-# xL[2] = 1.0
-# xL[3:4] .= 0.0
 @variable(full_model, xL[i] <= x[i=1:50] <= xU[i])
 
 # Register ModelingToolkit nonlinear system as constraints and objective
