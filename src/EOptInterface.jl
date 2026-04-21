@@ -12,17 +12,24 @@
 
 module EOptInterface
 
-# ---- imports ----
-using ModelingToolkit
-using ModelingToolkit: t_nounits as t, D_nounits as D
+    # Imports
+    import JuMP
+    import ModelingToolkit
+    import ModelingToolkit: t_nounits as t, D_nounits as D
+    import Reexport
+    import Symbolics
+    import SymbolicUtils
 
-using JuMP
+    # Reexports
+    Reexport.@reexport using SciCompDSL
 
-# ---- includes ----
-include("basefuncs.jl")
-include("userfuncs.jl")
+    # Include base functions
+    include("basefuncs.jl")
 
-# ---- exports ----
-export decision_vars, full_solutions, register_nlsystem, register_odesystem
+    # Include user functions
+    include("userfuncs.jl")
 
-end # module
+    # Exports
+    export decision_vars, full_solution, register_nlsystem, register_odesystem
+
+end

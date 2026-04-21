@@ -1,5 +1,10 @@
-using Test, EOptInterface, JuMP, ModelingToolkit, Ipopt
+using EOptInterface
+using Ipopt
+using JuMP
+using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
+using SciCompDSL
+using Test
 
 @testset "Algebraic Model" begin
 
@@ -136,7 +141,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     EOptInterface.decision_vars(system)
     xL = zeros(6)
     xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
-    @variable(model, xL[i] <= x[i=1:6] <= xU[i])
+    JuMP.@variable(model, xL[i] <= x[i=1:6] <= xU[i])
     EOptInterface.register_nlsystem(model, system, obj, [g1, g2])
     JuMP.optimize!(model)
     soln_dict = EOptInterface.full_solution(model, system)
@@ -194,7 +199,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     @test isapprox(soln_dict[system.sep2.outL.y_A].val, 0.0, atol=1e-6)
     @test isapprox(soln_dict[system.sep2.outL.y_B].val, 0.0, atol=1e-6)
     @test isapprox(soln_dict[system.sep2.outL.y_C].val, 1.0, atol=1e-6)
-  
+
 end
 
 @testset "ODE Model" begin
@@ -239,28 +244,28 @@ end
     include("kinetic_intensity_data.jl")
     intensity(x_A, x_B, x_D) = x_A + 2/21*x_B + 2/21*x_D
 
-    model = Model(Ipopt.Optimizer)
+    model = JuMP.Model(Ipopt.Optimizer)
     V = length(unknowns(system))
-    @variable(model, -75.0 <= z[1:V,1:N] <= 150.0)
+    JuMP.@variable(model, -75.0 <= z[1:V,1:N] <= 150.0)
     pL = [10.0, 10.0, 0.001]
     pU = [1200.0, 1200.0, 40.0]
-    @variable(model, pL[i] <= p[i=1:3] <= pU[i])
+    JuMP.@variable(model, pL[i] <= p[i=1:3] <= pU[i])
     EOptInterface.register_odesystem(model, system, tspan, tstep, "EE")
-    @objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
     JuMP.optimize!(model)
 
-    @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
-    @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
-    @test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-6)
+    Test.@test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
+    Test.@test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
+    Test.@test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-6)
 
-    model = Model(Ipopt.Optimizer)
+    model = JuMP.Model(Ipopt.Optimizer)
     V = length(unknowns(system))
-    @variable(model, -75.0 <= z[1:V,1:N] <= 150.0)
+    JuMP.@variable(model, -75.0 <= z[1:V,1:N] <= 150.0)
     pL = [10.0, 10.0, 0.001]
     pU = [1200.0, 1200.0, 40.0]
-    @variable(model, pL[i] <= p[i=1:3] <= pU[i])
+    JuMP.@variable(model, pL[i] <= p[i=1:3] <= pU[i])
     EOptInterface.register_odesystem(model, system, tspan, tstep, "IE")
-    @objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
     JuMP.optimize!(model)
 
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED

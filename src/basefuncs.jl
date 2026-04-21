@@ -12,7 +12,7 @@
 ################################################################################
 
 function mtk_generate_model_equations(sys::ModelingToolkit.System)
-    param_dict = copy(ModelingToolkit.defaults(sys))
+    param_dict = copy(ModelingToolkit.initial_conditions(sys))
     h = []
     for i in eachindex(ModelingToolkit.unknowns(sys))
         expr = (ModelingToolkit.full_equations(ModelingToolkit.expand_connections(sys))[i].rhs 
@@ -31,7 +31,7 @@ function mtk_generate_model_equations(sys::ModelingToolkit.System)
 end
 
 function mtk_generate_reduced_expression(expr::Symbolics.Num, sys::ModelingToolkit.System)
-    sub_dict = ModelingToolkit.defaults(sys)
+    sub_dict = ModelingToolkit.initial_conditions(sys)
     for eqn in ModelingToolkit.observed(sys)
         sub_dict[eqn.lhs] = eqn.rhs
     end
