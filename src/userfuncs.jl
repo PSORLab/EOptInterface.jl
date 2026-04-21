@@ -101,9 +101,9 @@ end
 
 Returns a dictionary of optimal solution values for the observed variables of an algebraic ModelingToolkit system if the JuMP model is solved.
 """
-    sub_dict = ModelingToolkit.defaults(sys)
 function full_solution(model::JuMP.Model, sys::ModelingToolkit.System)
     vars = EOptInterface.decision_vars(sys)
+    sub_dict = ModelingToolkit.defaults(sys)
     for i in eachindex(vars)
         sub_dict[vars[i]] = JuMP.value.(JuMP.all_variables(model)[i])
     end
