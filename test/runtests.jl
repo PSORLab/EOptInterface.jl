@@ -55,7 +55,7 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     JuMP.optimize!(model)
     @test abs(JuMP.value.(xvar)[6] - 26.316700011101723)/26.316700011101723 < 1e-6
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
-    @test abs(EOptInterface.full_solutions(model, n)[n.y_3C] - 0.01385685924868818)/0.01385685924868818 < 1e-6
+    @test abs(EOptInterface.full_solution(model, n)[n.y_3C] - 0.01385685924868818)/0.01385685924868818 < 1e-6
 
     @mtkmodel KineticParameterEstimation begin
         @parameters begin

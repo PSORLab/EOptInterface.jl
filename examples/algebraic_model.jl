@@ -1,7 +1,7 @@
-using ModelingToolkit, JuMP, EOptInterface
+using ModelingToolkit, JuMP, EAGO, EOptInterface
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
-# Formulate MTK algebraic System
+# Create algebraic ModelingToolkit system
 @connector Stream begin
     @variables begin
         F(t),   [input=true]
@@ -20,10 +20,13 @@ end
         out = Stream()
     end
     @parameters begin
-        F       # Free design variable
-        y_A = 1
-        y_B = 0
-        y_C = 0
+        # Unknown parameters (free design variables)
+        F
+
+        # Known parameters
+        y_A = 1.0
+        y_B = 0.0
+        y_C = 0.0
     end
     @equations begin
         out.F ~ F
@@ -51,7 +54,10 @@ end
         out = Stream()
     end
     @parameters begin
-        V       # Free design variable
+        # Unknown parameters (free design variables)
+        V
+
+        # Known parameters
         k_1 = 0.4
         k_2 = 0.055
     end
@@ -61,7 +67,7 @@ end
     end
     @equations begin
         out.F ~ in.F
-        out.y_A + out.y_B + out.y_C ~ 1
+        out.y_A + out.y_B + out.y_C ~ 1.0
         out.y_B*out.F ~ in.y_B*in.F + (r_1 - r_2)*V
         out.y_C*out.F ~ in.y_C*in.F + r_2*V
     end
@@ -77,12 +83,12 @@ end
         in.y_B*in.F ~ outL.y_B*outL.F
         in.y_C*in.F ~ outL.y_C*outL.F
         
-        outV.y_A + outV.y_B + outV.y_C ~ 1
-        outV.y_C ~ 0
-        outV.y_B ~ 0
+        outV.y_A + outV.y_B + outV.y_C ~ 1.0
+        outV.y_C ~ 0.0
+        outV.y_B ~ 0.0
 
-        outL.y_A + outL.y_B + outL.y_C ~ 1
-        outL.y_A ~ 0
+        outL.y_A + outL.y_B + outL.y_C ~ 1.0
+        outL.y_A ~ 0.0
     end
 end
 @mtkmodel Separator2 begin
@@ -95,13 +101,13 @@ end
         in.F ~ outV.F + outL.F
         in.y_B*in.F ~ outV.F
 
-        outV.y_A + outV.y_B + outV.y_C ~ 1
-        outV.y_A ~ 0
-        outV.y_C ~ 0
+        outV.y_A + outV.y_B + outV.y_C ~ 1.0
+        outV.y_A ~ 0.0
+        outV.y_C ~ 0.0
 
-        outL.y_A + outL.y_B + outL.y_C ~ 1
-        outL.y_A ~ 0
-        outL.y_B ~ 0
+        outL.y_A + outL.y_B + outL.y_C ~ 1.0
+        outL.y_A ~ 0.0
+        outL.y_B ~ 0.0
     end
 end
 @mtkmodel ReactorSeparatorRecycle begin
@@ -121,52 +127,80 @@ end
     end
 end
 
-@mtkcompile s = ReactorSeparatorRecycle()
+# Compile system
+@mtkcompile system = ReactorSeparatorRecycle()
 
 # Define symbolic expressions of constraints and objective
 # Use syntax System.Component.Connector.Variable, System.Component.Component.Parameter, or System.Component.Parameter
-exprF5 = s.sep2.outV.F
-exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
-f_CSTR = (25764 + 8178*s.cstr.V)/2.5
-s1cap = 132718 + s.cstr.out.F*(369*s.cstr.out.y_A - 1113.9*s.cstr.out.y_B)
-s2cap = 25000 + s.sep1.outL.F*(6984.5*s.sep1.outL.y_B - 3869.53*s.sep1.outL.y_C^2)
-s1op = s.cstr.out.F*(3+36.11*s.cstr.out.y_A + 7.71*s.cstr.out.y_B)*26.32e-3
-s2op = s.sep1.outL.F*(26.21 + 29.45*s.sep1.outL.y_B)*26.32e-3;
-f_Sep = (s1cap+s2cap)/2.5 + 0.52*(s1op+s2op)
-g1 = 25 - exprF5
+exprF5 = system.sep2.outV.F
+exprTau = system.cstr.V/(system.cstr.out.F*(system.cstr.out.y_A*system.cstr.in.V_A + system.cstr.out.y_B*system.cstr.in.V_B + system.cstr.out.y_C*system.cstr.in.V_C))
+f_CSTR = (25764.0 + 8178.0*system.cstr.V)/2.5
+s1cap = 132718.0 + system.cstr.out.F*(369.0*system.cstr.out.y_A - 1113.9*system.cstr.out.y_B)
+s2cap = 25000.0 + system.sep1.outL.F*(6984.5*system.sep1.outL.y_B - 3869.53*system.sep1.outL.y_C^2)
+s1op = system.cstr.out.F*(3.0 + 36.11*system.cstr.out.y_A + 7.71*system.cstr.out.y_B)*26.32e-3
+s2op = system.sep1.outL.F*(26.21 + 29.45*system.sep1.outL.y_B)*26.32e-3
+f_Sep = (s1cap + s2cap)/2.5 + 0.52*(s1op + s2op)
+g1 = 25.0 - exprF5
 g2 = 475/3600 - exprTau
 obj = f_CSTR + f_Sep
 
-# Solve using EAGO
-using EAGO
-model = Model(EAGO.Optimizer)
-decision_vars(s) # Displays: sep1₊in₊F(t), sep1₊in₊y_B(t), sep1₊in₊y_C(t), sep1₊outL₊y_C(t), influent₊F, cstr₊V
-xL = zeros(6) # lower bound on x
-xU = [100, 1, 1, 1, 100, 10] # upper bound on x
-@variable(model, xL[i] <= x[i=1:6] <= xU[i]) # ̂x = (̂z,p), ̂z = (z(t),...), p = (influent₊F, cstr₊V)
-register_nlsystem(model, s, obj, [g1, g2])
-JuMP.optimize!(model)
-JuMP.value.(x)
+# Solve reduced-space model
+# Create JuMP model
+# model = Model(EAGO.Optimizer)
 
-# Obtain observed variable solutions
-full_solutions(model, s)
+# Retrieve decision variables from ModelingToolkit system
+# Returns [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t), influent₊F, cstr₊V]
+# decision_vars(system)
+
+# Create decision variables
+# z = [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t)]
+# p = [influent₊F, cstr₊V]
+# xL = zeros(6)
+# xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
+# @variable(model, xL[i] <= x[i=1:6] <= xU[i])
+
+# Register ModelingToolkit nonlinear system as constraints and register objective
+# register_nlsystem(model, system, obj, [g1, g2])
+
+# Optimize model
+# JuMP.optimize!(model)
 
 # Display results
-println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+# println("Termination Status: $(JuMP.termination_status(model))")
+# println("Primal Status: $(JuMP.primal_status(model))")
+# println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
+# println("f^* = $(round(JuMP.objective_value(model), digits=5))")
+# println("x* = $(round.(JuMP.value.(x), digits=3))")
 
-# Solving unsimplified model
-@named fs = ReactorSeparatorRecycle()
-decision_vars(fs)
-fmodel = Model(EAGO.Optimizer)
+# Retrieve full-space solution
+# full_solution(model, system)
+
+# Solve full-space model
+# Compile system
+@named full_system = ReactorSeparatorRecycle()
+
+# Create JuMP model
+full_model = Model(EAGO.Optimizer)
+set_optimizer_attribute(full_model, "cp_depth", 0)
+set_optimizer_attribute(full_model, "fbbt_lp_depth", 0)
+# set_optimizer_attribute(full_model, "obbt_depth", 0)
+set_optimizer_attribute(full_model, "iteration_limit", 40000)
+
+# Create decision variables
 xL = zeros(50)
-xU = vcat(repeat([100, 1, 1, 1],12), 100, 10)
-@variable(fmodel, xL[i] <= x[i=1:50] <= xU[i])
-register_nlsystem(fmodel, fs, obj, [g1, g2])
-JuMP.optimize!(fmodel)
-println("STATUS: $(JuMP.termination_status(fmodel)), RESULT CODE: $(JuMP.primal_status(fmodel))")
-println("TIME: $(round.(JuMP.solve_time(fmodel),digits=5))")
-println("f^* = $(round(JuMP.objective_value(fmodel),digits=5))")
-println("x* = $(round.(JuMP.value.(x),digits=3)).")
+xL = vcat(repeat([0.0, 0.0, 0.0, 0.0], 12), 0.0, 0.0)
+xU = vcat(repeat([100.0, 1.0, 1.0, 1.0], 12), 100.0, 10.0)
+# xL[2] = 1.0
+# xL[3:4] .= 0.0
+@variable(full_model, xL[i] <= x[i=1:50] <= xU[i])
+
+# Register ModelingToolkit nonlinear system as constraints and objective
+register_nlsystem(full_model, full_system, obj, [g1, g2])
+
+# Optimize model and retrieve results
+JuMP.optimize!(full_model)
+println("Termination Status: $(JuMP.termination_status(full_model))")
+println("Primal Status: $(JuMP.primal_status(full_model))")
+println("Solve Time: $(round.(JuMP.solve_time(full_model), digits=5))")
+println("f^* = $(round(JuMP.objective_value(full_model), digits=5))")
+println("x* = $(round.(JuMP.value.(x), digits=3))")

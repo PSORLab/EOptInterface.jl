@@ -1,27 +1,31 @@
-using ModelingToolkit, JuMP, EOptInterface
+using ModelingToolkit, JuMP, Ipopt, EOptInterface
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
-# Formulate MTK ODE System
+# Create ModelingToolkit ODE system
 @mtkmodel KineticParameterEstimation begin
     @parameters begin
-        T = 273
-        K_2 = 46*exp(6500/T-18)
-        K_3 = 2*K_2
-        k_1 = 53
+        # Known parameters
+        T = 273.0
+        K_2 = 46.0*exp(6500.0/T - 18.0)
+        K_3 = 2.0*K_2
+        k_1 = 53.0
         k_1s = k_1*1e-6
         k_5 = 1.2e-3
         c_O2 = 2e-3
 
-        k_2f    # Free design variable
-        k_3f    # Free design variable
-        k_4     # Free design variable
+        # Unknown parameters (free design variables)
+        k_2f
+        k_3f
+        k_4
     end
     @variables begin
+        # Initial conditions given for differential variables
         x_A(t) = 0.0
         x_B(t) = 0.0
         x_D(t) = 0.0
         x_Y(t) = 0.4
         x_Z(t) = 140.0
+
         I(t)
     end
     @equations begin
@@ -34,33 +38,47 @@ using ModelingToolkit: t_nounits as t, D_nounits as D
     end
 end
 
-@mtkcompile o = KineticParameterEstimation()
+# Compile system
+@mtkcompile system = KineticParameterEstimation()
 
-tspan = (0.0,2.0)
+# Define integration time span
+tspan = (0.0, 2.0)
 tstep = 0.01
+N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
+
+# Include experimental intensity data
 include("kinetic_intensity_data.jl")
-intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
+# Define intensity function
+intensity(x_A, x_B, x_D) = x_A + 2/21*x_B + 2/21*x_D
 
-# Solve using Ipopt
-using Ipopt
-model = Model(Ipopt.Optimizer)
-decision_vars(o) # Displays: x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4
-# FIRST, create discretized differntial state decision variables "z"
-N = Int(floor((tspan[2] - tspan[1])/tstep))+1
-V = length(unknowns(o))
-zL = zeros(V) # lower bound on z
-zU = [140.0, 0.4, 140.0, 140.0, 140.0] # upper bound on z
-@variable(model, zL[i] <= z[i in 1:V,1:N] <= zU[i]) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
-# SECOND, create free design decision variables "p"
-pL = [10, 10, 0.001] # lower bound on p
-pU = [1200, 1200, 40] # upper bound on p
-@variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
-register_odesystem(model, o, tspan, tstep, "EE")
-@objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
+# Create JuMP model
+model = Model(EAGO.Optimizer)
+
+# Retrieve decision variables from ModelingToolkit system
+# Returns [x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4]
+decision_vars(system)
+
+# Create discretized state decision variables
+# z = [x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t)]
+V = length(unknowns(system))
+@variable(model, -75.0 <= z[1:V,1:N] <= 150.0)
+
+# Create free design decision variables
+# p = [k_2f, k_3f, k_4]
+pL = [10.0, 10.0, 0.001]
+pU = [1200.0, 1200.0, 40.0]
+@variable(model, pL[i] <= p[i=1:3] <= pU[i])
+
+# Register ModelingToolkit ODE system as constraints
+register_odesystem(model, system, tspan, tstep, "IE")
+
+# Define objective function
+@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+
+# Optimize model and retrieve results
 JuMP.optimize!(model)
-
-# Display results
-println("STATUS: $(JuMP.termination_status(model)), RESULT CODE: $(JuMP.primal_status(model))")
-println("TIME: $(round.(JuMP.solve_time(model),digits=5))")
-println("f^* = $(round(JuMP.objective_value(model),digits=5))")
-println("p* = $(round.(JuMP.value.(p),digits=3)).")
+println("Termination Status: $(JuMP.termination_status(model))")
+println("Primal Status: $(JuMP.primal_status(model))")
+println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
+println("f^* = $(round(JuMP.objective_value(model), digits=5))")
+println("p* = $(round.(JuMP.value.(p), digits=3))")
