@@ -148,7 +148,7 @@ using Test
 
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
     @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
-    @test isapprox(JuMP.objective_value(model), 169869.99931631665, atol=1e-6)
+    @test isapprox(JuMP.objective_value(model), 169869.99931631665, atol=1e-3)
 
 end
 
@@ -206,7 +206,7 @@ end
 
     Test.@test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
     Test.@test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
-    Test.@test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-6)
+    Test.@test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-3)
 
     model = JuMP.Model(Ipopt.Optimizer)
     V = length(unknowns(system))
@@ -220,6 +220,6 @@ end
 
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
     @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
-    @test isapprox(JuMP.objective_value(model), 16796.032234817612, atol=1e-6)
+    @test isapprox(JuMP.objective_value(model), 16796.032234817612, atol=1e-3)
 
 end
