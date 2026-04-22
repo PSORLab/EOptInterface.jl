@@ -47,6 +47,7 @@ function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::
     JuMP.@constraint(model, [i in eachindex(h)], h[i](JuMP.all_variables(model)...) == 0)
     JuMP.@constraint(model, [i in eachindex(g)], g[i](JuMP.all_variables(model)...) ≤ 0)
     JuMP.@objective(model, Min, f(JuMP.all_variables(model)...))
+    return
 end
 
 """
@@ -56,15 +57,21 @@ Automatically applies forward transcription and registers the discretized ODE Mo
 
 # Arguments
 - `model::JuMP.Model`: the JuMP model
-- `sys::ModelingToolkit.System`: the ModelingToolkit model
+- `sys::ModelingToolkit.System`: the ModelingToolkit system
 - `tspan::Tuple{Real,Real}`: the time span over which the dynamic model is simulated
 - `tstep::Real`: the time step used in the integration scheme
 - `integrator::String`: integration scheme used in discretization, `"EE"` for explicit Euler or `"IE"` for implicit Euler
 """
 function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
-    N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1  # Number of discrete time nodes
-    V = length(ModelingToolkit.unknowns(odesys))  # Number of ode variables
-    param_dict = copy(ModelingToolkit.defaults(odesys))
+    if integrator != "EE" && integrator != "IE"
+        error("Available integrators: EE, IE")
+        return
+    end
+    # Number of discrete time nodes
+    N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
+    # Number of ODE variables
+    V = length(ModelingToolkit.unknowns(odesys))
+    param_dict = copy(ModelingToolkit.initial_conditions(odesys).dict)
     for var in ModelingToolkit.unknowns(odesys)
         pop!(param_dict, var)
     end
@@ -82,8 +89,8 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
             )
         push!(dx, dxj)
     end
-    ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))+1:end]
-    xs = reshape(setdiff(JuMP.all_variables(model),ps), V, N)
+    ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys), ModelingToolkit.unknowns(odesys)))+1:end]
+    xs = reshape(setdiff(JuMP.all_variables(model), ps), V, N)
     # Extract initial conditions from the ModelingToolkit system and fix them in the JuMP model for x[1:V,1]
     JuMP.fix.(xs[:,1], [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))], force=true)
     # Formulate JuMP constraints based on chosen ODE discretization method
@@ -91,9 +98,8 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
         JuMP.@constraint(model, [j in 1:V, i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]..., ps...))
     elseif integrator == "IE"
         JuMP.@constraint(model, [j in 1:V, i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i+1]..., ps...))
-    else
-        error("Available integrators: EE, IE")
     end
+    return
 end
 
 """

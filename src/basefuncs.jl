@@ -39,5 +39,4 @@ function mtk_generate_reduced_expression(expr::Symbolics.Num, sys::ModelingToolk
         expr = SymbolicUtils.substitute(expr, sub_dict)
     end
     return Symbolics.build_function(expr, EOptInterface.decision_vars(sys)..., expression = Val{false})
-
 end

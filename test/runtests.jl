@@ -199,13 +199,17 @@ end
     pL = [10.0, 10.0, 0.001]
     pU = [1200.0, 1200.0, 40.0]
     JuMP.@variable(model, pL[i] <= p[i=1:3] <= pU[i])
+
+    @test_throws ErrorException("Available integrators: EE, IE") EOptInterface.register_odesystem(model, system, tspan, tstep, "RK4")
+
     EOptInterface.register_odesystem(model, system, tspan, tstep, "EE")
+
     JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
     JuMP.optimize!(model)
 
-    Test.@test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
-    Test.@test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
-    Test.@test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-3)
+    @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
+    @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
+    @test isapprox(JuMP.objective_value(model), 9622.762852574022, atol=1e-3)
 
     model = JuMP.Model(Ipopt.Optimizer)
     V = length(unknowns(system))
