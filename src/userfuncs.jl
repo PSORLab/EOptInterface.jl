@@ -65,7 +65,6 @@ Automatically applies forward transcription and registers the discretized ODE Mo
 function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     if integrator != "EE" && integrator != "IE"
         error("Available integrators: EE, IE")
-        return
     end
     # Number of discrete time nodes
     N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
