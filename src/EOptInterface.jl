@@ -16,12 +16,6 @@ module EOptInterface
     import JuMP
     import ModelingToolkit
     import ModelingToolkit: t_nounits as t, D_nounits as D
-    import Reexport
-    import Symbolics
-    import SymbolicUtils
-
-    # Reexports
-    Reexport.@reexport using SciCompDSL
 
     # Include base functions
     include("basefuncs.jl")

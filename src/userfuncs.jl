@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Joseph Choi, Dimitri Alston, Pengfei Xu, Matthew Stuber,
+﻿# Copyright (c) 2025 Joseph Choi, Dimitri Alston, Pengfei Xu, Matthew Stuber,
 # and the University of Connecticut (UConn)
 # This code is licensed under the MIT license (see LICENSE.md for full details).
 ################################################################################
@@ -20,7 +20,7 @@ Returns the decision variables for an optimization problem formulated from a Mod
 function decision_vars(sys::ModelingToolkit.System)
     return [
         ModelingToolkit.unknowns(sys); 
-        setdiff(ModelingToolkit.parameters(sys), keys(ModelingToolkit.initial_conditions(sys)))
+        setdiff(ModelingToolkit.parameters(sys), keys(ModelingToolkit.defaults(sys)))
         ]
 end
 
@@ -64,15 +64,13 @@ Automatically applies forward transcription and registers the discretized ODE Mo
 function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1  # Number of discrete time nodes
     V = length(ModelingToolkit.unknowns(odesys))  # Number of ode variables
-    param_dict = copy(ModelingToolkit.initial_conditions(odesys).dict)
+    param_dict = copy(ModelingToolkit.defaults(odesys))
     for var in ModelingToolkit.unknowns(odesys)
         pop!(param_dict, var)
     end
     dx = []
     for j in 1:V
         dxj_expr = ModelingToolkit.full_equations(odesys)[j].rhs
-        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(odesys))
-        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(odesys))
         # Fully substitute parameters with default values
         while ~isempty(intersect(Symbolics.get_variables(dxj_expr), keys(param_dict)))
             dxj_expr = SymbolicUtils.substitute(dxj_expr, param_dict)
@@ -87,7 +85,7 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
     ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys),ModelingToolkit.unknowns(odesys)))+1:end]
     xs = reshape(setdiff(JuMP.all_variables(model),ps), V, N)
     # Extract initial conditions from the ModelingToolkit system and fix them in the JuMP model for x[1:V,1]
-    JuMP.fix.(xs[:,1], [ModelingToolkit.initial_conditions(odesys)[ModelingToolkit.unknowns(odesys)[i]].val for i in eachindex(ModelingToolkit.unknowns(odesys))], force=true)
+    JuMP.fix.(xs[:,1], [ModelingToolkit.defaults(odesys)[ModelingToolkit.unknowns(odesys)[i]] for i in eachindex(ModelingToolkit.unknowns(odesys))], force=true)
     # Formulate JuMP constraints based on chosen ODE discretization method
     if integrator == "EE"
         JuMP.@constraint(model, [j in 1:V, i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]..., ps...))
@@ -105,7 +103,7 @@ Returns a dictionary of optimal solution values for the observed variables of an
 """
 function full_solution(model::JuMP.Model, sys::ModelingToolkit.System)
     vars = EOptInterface.decision_vars(sys)
-    sub_dict = ModelingToolkit.initial_conditions(sys)
+    sub_dict = ModelingToolkit.defaults(sys)
     for i in eachindex(vars)
         sub_dict[vars[i]] = JuMP.value.(JuMP.all_variables(model)[i])
     end
