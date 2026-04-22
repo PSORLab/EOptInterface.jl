@@ -12,8 +12,6 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 [compat]
 JuMP = "1"
 ModelingToolkit = "10"
-Symbolics = "7"
-SymbolicUtils = "4"
 julia = "1.10"
 
 [extras]
