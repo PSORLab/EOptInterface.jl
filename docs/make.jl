@@ -1,23 +1,22 @@
-using EOptInterface
 using Documenter
-
-DocMeta.setdocmeta!(EOptInterface, :DocTestSetup, :(using EOptInterface); recursive=true)
+using DocumenterTools
+using EOptInterface
 
 makedocs(;
-    modules=[EOptInterface],
-    authors="Joseph Choi <jsphchoi@mit.edu>",
-    sitename="EOptInterface.jl",
-    format=Documenter.HTML(;
-        canonical="https://PSORLab.github.io/EOptInterface.jl",
-        edit_link="master",
-        assets=String[],
+    modules = [EOptInterface],
+    authors = "Joseph Choi, Dimitri Alston, Pengfei Xu, and Matthew Stuber",
+    sitename = "EOptInterface.jl",
+    format = Documenter.HTML(;
+             canonical = "https://PSORLab.github.io/EOptInterface.jl/stable",
+             collapselevel = 1,
+             assets = ["assets/favicon.ico"],
     ),
-    pages=[
-        "Home" => "index.md",
+    pages = Any[
+        "API Reference" => "index.md",
+        "News" => "news.md",
     ],
 )
 
 deploydocs(;
-    repo="github.com/PSORLab/EOptInterface.jl",
-    devbranch="master",
+    repo = "github.com/PSORLab/EOptInterface.jl",
 )

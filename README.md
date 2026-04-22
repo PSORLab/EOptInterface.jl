@@ -4,13 +4,11 @@
 
 | **PSOR Lab** | **Build Status**                                                                                |
 |:------------:|:-----------------------------------------------------------------------------------------------:|
-| [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/EOptInterface.jl/workflows/CI/badge.svg?branch=main)](https://github.com/PSORLab/EOptInterface.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/EOptInterface.jl/graph/badge.svg?token=1x9pOV439N)](https://codecov.io/gh/PSORLab/EOptInterface.jl) |
+| [![](https://img.shields.io/badge/Developed_by-PSOR_Lab-342674)](https://psor.uconn.edu/) | [![Build Status](https://github.com/PSORLab/EOptInterface.jl/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PSORLab/EOptInterface.jl/actions?query=workflow%3ACI) [![codecov](https://codecov.io/gh/PSORLab/EOptInterface.jl/graph/badge.svg?token=1x9pOV439N)](https://codecov.io/gh/PSORLab/EOptInterface.jl) |
 
-<!-- 
- **Documentation**                                                 |
- :-----------------------------------------------------------------:|
-  [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/dev/) |
--->
+| **Documentation**                                                 |
+|:-----------------------------------------------------------------:|
+| [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/stable) [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/dev) |
 
 ## Feature Summary
 
