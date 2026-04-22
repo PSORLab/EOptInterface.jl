@@ -3,7 +3,6 @@ using Ipopt
 using JuMP
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
-using SciCompDSL
 using Test
 
 @testset "Algebraic Model" begin
