@@ -16,6 +16,8 @@ module EOptInterface
     import JuMP
     import ModelingToolkit
     import ModelingToolkit: t_nounits as t, D_nounits as D
+    import Symbolics
+    import SymbolicUtils
 
     # Include base functions
     include("basefuncs.jl")
