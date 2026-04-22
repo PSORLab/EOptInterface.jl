@@ -71,7 +71,7 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
     N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
     # Number of ODE variables
     V = length(ModelingToolkit.unknowns(odesys))
-    param_dict = copy(ModelingToolkit.initial_conditions(odesys).dict)
+    param_dict = copy(ModelingToolkit.defaults(odesys))
     for var in ModelingToolkit.unknowns(odesys)
         pop!(param_dict, var)
     end
