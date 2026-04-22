@@ -52,7 +52,7 @@ include("kinetic_intensity_data.jl")
 intensity(x_A, x_B, x_D) = x_A + 2/21*x_B + 2/21*x_D
 
 # Create JuMP model
-model = Model(EAGO.Optimizer)
+model = Model(Ipopt.Optimizer)
 
 # Retrieve decision variables from ModelingToolkit system
 # Returns [x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t), k_2f, k_3f, k_4]
