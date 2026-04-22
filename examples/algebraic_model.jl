@@ -149,11 +149,11 @@ obj = f_CSTR + f_Sep
 model = Model(EAGO.Optimizer)
 
 # Retrieve decision variables from ModelingToolkit system
-# Returns [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t), influent₊F, cstr₊V]
+# Returns [sep1.in.F(t), sep1.in.y_B(t), sep1.in.y_C(t), sep1.outL.y_C(t), influent₊F, cstr₊V]
 decision_vars(system)
 
 # Create decision variables
-# z = [mixer₊in2₊F(t), cstr₊out₊y_B(t), cstr₊out₊y_A(t), sep1₊outL₊y_B(t)]
+# z = [sep1.in.F(t), sep1.in.y_B(t), sep1.in.y_C(t), sep1.outL.y_C(t)]
 # p = [influent₊F, cstr₊V]
 xL = zeros(6)
 xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
