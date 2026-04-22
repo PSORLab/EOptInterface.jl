@@ -37,7 +37,7 @@ Automatically applies forward transcription and registers the discretized ODE `M
 
 ## Examples
 
-The code for these examples can be found in [`src/examples/`](https://github.com/PSORLab/EOptInterface.jl/tree/main/examples).
+The code for these examples can be found in the [`examples/`](https://github.com/PSORLab/EOptInterface.jl/tree/main/examples) subdirectory.
 
 ### [Algebraic System](https://github.com/PSORLab/EOptInterface.jl/blob/main/examples/algebraic_model.jl)
 
