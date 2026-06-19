@@ -1,7 +1,7 @@
 name = "EOptInterface"
 uuid = "96d9f51d-8c41-4e2d-b1a3-7b48dea3ddd1"
 authors = ["Joseph Choi <jsphchoi@mit.edu>", "Dimitri Alston <dimitri.alston@uconn.edu>", "Pengfei Xu <pengfei.xu@uconn.edu>", "Matthew Stuber <matthew.stuber@uconn.edu>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
