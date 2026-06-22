@@ -150,6 +150,10 @@ using Test
     @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
     @test isapprox(JuMP.objective_value(model), 169869.99931631665, atol=1e-3)
 
+    model = JuMP.Model(Ipopt.Optimizer)
+    JuMP.@variable(model, xL[i] <= x[i=1:6] <= xU[i])
+    EOptInterface.register_nlsystem(model, system, obj)
+
 end
 
 @testset "ODE Model" begin

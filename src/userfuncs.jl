@@ -33,11 +33,11 @@ function and `Vector{Symbolics.Num}` constraints from a `ModelingToolkit.System`
 to a `JuMP.Model`.
 """
 function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::Symbolics.Num, ineqs::Vector{Symbolics.Num})
-    h = EOptInterface.mtk_generate_model_equations(sys)
-    f = EOptInterface.mtk_generate_reduced_expression(obj, sys)
+    h = EOptInterface._generate_model_equations(sys)
+    f = EOptInterface._generate_reduced_expression(obj, sys)
     g = []
     for i in eachindex(ineqs)
-        gi = EOptInterface.mtk_generate_reduced_expression(ineqs[i], sys)
+        gi = EOptInterface._generate_reduced_expression(ineqs[i], sys)
         push!(g, gi)
     end
     JuMP.@constraint(model, [i in eachindex(h)], h[i](JuMP.all_variables(model)...) == 0)
@@ -49,9 +49,23 @@ end
 """
     $(DocStringExtensions.TYPEDSIGNATURES)
 
+Automatically formulates and adds a user-provided `Symbolics.Num` objective 
+function from a `ModelingToolkit.System` to a `JuMP.Model`.
+"""
+function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::Symbolics.Num)
+    h = EOptInterface._generate_model_equations(sys)
+    f = EOptInterface._generate_reduced_expression(obj, sys)
+    JuMP.@constraint(model, [i in eachindex(h)], h[i](JuMP.all_variables(model)...) == 0)
+    JuMP.@objective(model, Min, f(JuMP.all_variables(model)...))
+    return
+end
+
+"""
+    $(DocStringExtensions.TYPEDSIGNATURES)
+
 Automatically applies specified direct transcription method and registers the 
 discretized ODE `ModelingToolkit.System` as algebraic JuMP constraints.
-Current supports Explicit Euler "EE" and Implicit Euler "IE".
+Currently supports Explicit Euler "EE" and Implicit Euler "IE".
 """
 function register_odesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     if integrator != "EE" && integrator != "IE"
