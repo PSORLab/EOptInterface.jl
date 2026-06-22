@@ -13,12 +13,13 @@
 module EOptInterface
 
     # Imports
+    import DocStringExtensions
     import JuMP
     import ModelingToolkit
     import ModelingToolkit: t_nounits as t, D_nounits as D
     import Reexport
-    import Symbolics
     import SymbolicUtils
+    import Symbolics
 
     # Reexports
     Reexport.@reexport using SciCompDSL

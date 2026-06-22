@@ -10,32 +10,9 @@
 |:-----------------------------------------------------------------:|
 | [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/stable) [![](https://img.shields.io/badge/docs-latest-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/dev) |
 
-## Feature Summary
-
-```julia
-decision_vars(::ModelingToolkit.System)
-```
-Returns the decision variables for an optimization problem formulated from a `ModelingToolkit` system.
-
-```julia
-register_nlsystem(::JuMP.Model, ::ModelingToolkit.System, obj::Symbolics.Num, ineqs::Vector{Symbolics.Num})
-```
-Automatically formulates algebraic `JuMP` constraints and objective function from
-an algebraic `ModelingToolkit` system and user-provided constraints and objective symbolic expressions.
-
-```julia
-full_solution(::JuMP.Model, ::ModelingToolkit.System)
-```
-Returns a dictionary of optimal solution values for the observed variables of an algebraic `ModelingToolkit` system if the `JuMP` model is solved.
-
-```julia
-register_odesystem(::JuMP.Model, ::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, solver::String)
-```
-Automatically applies forward transcription and registers the discretized ODE `ModelingToolkit` system as algebraic `JuMP` constraints. Available integration methods: `"EE"` (explicit Euler), `"IE"` (implicit Euler).
-
 ## Examples
 
-The code for these examples can be found in the [`examples/`](https://github.com/PSORLab/EOptInterface.jl/tree/main/examples) subdirectory.
+The code and notebooks for these examples can be found in the [`examples/`](https://github.com/PSORLab/EOptInterface.jl/tree/main/examples) subdirectory.
 
 ### [Algebraic System](https://github.com/PSORLab/EOptInterface.jl/blob/main/examples/algebraic_model.jl)
 
@@ -43,7 +20,7 @@ An optimal reactor-separator-recycle process design problem originally presented
 
 ### [ODE System](https://github.com/PSORLab/EOptInterface.jl/blob/main/examples/ode_model.jl)
 
-A nonlinear kinetic parameter estimation problem originally described by [[5](#references)] is used to demonstrate the use of `register_odesystem` to formulate and solve an ODE system using `Ipopt` [[6](#references)].
+A nonlinear kinetic parameter estimation problem originally described by [[5](#references)] is used to demonstrate the use of `register_odesystem` to formulate and solve an ODE system using [`Ipopt`](https://github.com/coin-or/ipopt) [[6](#references)].
 
 ## References
 1. Ma, Y., Gowda, S., Anantharaman, R., Laughman, C., Shah, V., and Rackauckas, C. ModelingToolkit: A Composable Graph Transformation System For Equation-Based Modeling. (2022). DOI: [10.48550/arXiv.2103.05244)](https://doi.org/10.48550/arXiv.2103.05244)

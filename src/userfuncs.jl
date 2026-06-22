@@ -13,9 +13,10 @@
 ################################################################################
 
 """
-    decision_vars(sys)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the decision variables for an optimization problem formulated from a ModelingToolkit system.
+Returns the decision variables for an optimization problem from a 
+`ModelingToolkit.System`.
 """
 function decision_vars(sys::ModelingToolkit.System)
     return [
@@ -25,16 +26,11 @@ function decision_vars(sys::ModelingToolkit.System)
 end
 
 """
-    register_nlsystem(model, sys, obj, ineqs)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
-Automatically formulates algebraic JuMP constraints and objective function from
-an algebraic ModelingToolkit system and user-provided constraints and objective symbolic expressions.
-
-# Arguments
-- `model::JuMP.Model`: the JuMP model
-- `sys::ModelingToolkit.System`: the ModelingToolkit system
-- `obj::Symbolics.Num`: a symbolic expression of the objective function using the ModelingToolkit system variables
-- `ineqs::Vector{Symbolics.Num}`: a vector of symbolic expressions of inequality constraints using the ModelingToolkit system variables
+Automatically formulates and adds user-provided `Symbolics.Num` objective 
+function and `Vector{Symbolics.Num}` constraints from a `ModelingToolkit.System` 
+to a `JuMP.Model`.
 """
 function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::Symbolics.Num, ineqs::Vector{Symbolics.Num})
     h = EOptInterface.mtk_generate_model_equations(sys)
@@ -53,47 +49,44 @@ end
 """
     register_odesystem(model, sys, tspan, tstep, integrator)
 
-Automatically applies forward transcription and registers the discretized ODE ModelingToolkit system as algebraic JuMP constraints.
-
-# Arguments
-- `model::JuMP.Model`: the JuMP model
-- `sys::ModelingToolkit.System`: the ModelingToolkit system
-- `tspan::Tuple{Real,Real}`: the time span over which the dynamic model is simulated
-- `tstep::Real`: the time step used in the integration scheme
-- `integrator::String`: integration scheme used in discretization, `"EE"` for explicit Euler or `"IE"` for implicit Euler
 """
-function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
+    $(DocStringExtensions.TYPEDSIGNATURES)
+
+Automatically applies forward transcription and registers the discretized 
+ODE `ModelingToolkit.System` as algebraic JuMP constraints.
+"""
+function register_odesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     if integrator != "EE" && integrator != "IE"
         error("Available integrators: EE, IE")
     end
     # Number of discrete time nodes
     N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
     # Number of ODE variables
-    V = length(ModelingToolkit.unknowns(odesys))
-    param_dict = copy(ModelingToolkit.initial_conditions(odesys).dict)
-    for var in ModelingToolkit.unknowns(odesys)
+    V = length(ModelingToolkit.unknowns(sys))
+    param_dict = copy(ModelingToolkit.initial_conditions(sys).dict)
+    for var in ModelingToolkit.unknowns(sys)
         pop!(param_dict, var)
     end
     dx = []
     for j in 1:V
-        dxj_expr = ModelingToolkit.full_equations(odesys)[j].rhs
-        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(odesys))
-        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(odesys))
+        dxj_expr = ModelingToolkit.full_equations(sys)[j].rhs
+        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(sys))
+        dxj_expr = SymbolicUtils.substitute(dxj_expr, ModelingToolkit.bindings(sys))
         # Fully substitute parameters with default values
         while ~isempty(intersect(Symbolics.get_variables(dxj_expr), keys(param_dict)))
             dxj_expr = SymbolicUtils.substitute(dxj_expr, param_dict)
         end
         dxj = Symbolics.build_function(
             dxj_expr,
-            EOptInterface.decision_vars(odesys)..., 
+            EOptInterface.decision_vars(sys)..., 
             expression = Val{false}
             )
         push!(dx, dxj)
     end
-    ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(odesys), ModelingToolkit.unknowns(odesys)))+1:end]
+    ps = JuMP.all_variables(model)[end-length(setdiff(EOptInterface.decision_vars(sys), ModelingToolkit.unknowns(sys)))+1:end]
     xs = reshape(setdiff(JuMP.all_variables(model), ps), V, N)
     # Extract initial conditions from the ModelingToolkit system and fix them in the JuMP model for x[1:V,1]
-    JuMP.fix.(xs[:,1], [ModelingToolkit.initial_conditions(odesys)[ModelingToolkit.unknowns(odesys)[i]].val for i in eachindex(ModelingToolkit.unknowns(odesys))], force=true)
+    JuMP.fix.(xs[:,1], [ModelingToolkit.initial_conditions(sys)[ModelingToolkit.unknowns(sys)[i]].val for i in eachindex(ModelingToolkit.unknowns(sys))], force=true)
     # Formulate JuMP constraints based on chosen ODE discretization method
     if integrator == "EE"
         JuMP.@constraint(model, [j in 1:V, i in 1:(N-1)], xs[j,i+1] == xs[j,i] + tstep*dx[j](xs[:,i]..., ps...))
@@ -104,9 +97,10 @@ function register_odesystem(model::JuMP.Model, odesys::ModelingToolkit.System, t
 end
 
 """
-    full_solution(model, sys)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns a dictionary of optimal solution values for the observed variables of an algebraic ModelingToolkit system if the JuMP model is solved.
+Returns a dictionary of optimal solution values for the observed variables of a 
+`ModelingToolkit.System` if the `JuMP.Model` is solved.
 """
 function full_solution(model::JuMP.Model, sys::ModelingToolkit.System)
     vars = EOptInterface.decision_vars(sys)
