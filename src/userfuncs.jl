@@ -13,7 +13,7 @@
 ################################################################################
 
 """
-    $(TYPEDSIGNATURES)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the decision variables for an optimization problem from a 
 `ModelingToolkit.System`.
@@ -26,7 +26,7 @@ function decision_vars(sys::ModelingToolkit.System)
 end
 
 """
-    $(TYPEDSIGNATURES)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
 Automatically formulates and adds user-provided `Symbolics.Num` objective 
 function and `Vector{Symbolics.Num}` constraints from a `ModelingToolkit.System` 
@@ -47,7 +47,7 @@ function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::
 end
 
 """
-    $(TYPEDSIGNATURES)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
 Automatically applies specified direct transcription method and registers the 
 discretized ODE `ModelingToolkit.System` as algebraic JuMP constraints.
@@ -95,7 +95,7 @@ function register_odesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspa
 end
 
 """
-    $(TYPEDSIGNATURES)
+    $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns a dictionary of optimal solution values for the observed variables of a 
 `ModelingToolkit.System` if the `JuMP.Model` is solved.
