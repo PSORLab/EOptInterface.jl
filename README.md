@@ -22,6 +22,10 @@ An optimal reactor-separator-recycle process design problem originally presented
 
 A nonlinear kinetic parameter estimation problem originally described by [[5](#references)] is used to demonstrate the use of `register_odesystem` to formulate and solve an ODE system using [`Ipopt`](https://github.com/coin-or/ipopt) [[6](#references)].
 
+### [InfiniteOpt ODE System](https://github.com/PSORLab/EOptInterface.jl/blob/main/examples/infinite_model.jl)
+
+The same ODE example as above is formulated and solved using [`InfiniteOpt.jl`](https://github.com/infiniteopt/InfiniteOpt.jl) [[7](#references)].
+
 ## References
 1. Ma, Y., Gowda, S., Anantharaman, R., Laughman, C., Shah, V., and Rackauckas, C. ModelingToolkit: A Composable Graph Transformation System For Equation-Based Modeling. (2022). DOI: [10.48550/arXiv.2103.05244](https://doi.org/10.48550/arXiv.2103.05244)
 2. Lubin, M., Dowson, O., Dias Garcia, J., Huchette, J., Legat, B., and Vielma, J.P. JuMP 1.0: recent improvements to a modeling language for mathematical optimization. *Mathematical Programming Computation.* 15, 581-589 (2023). DOI: [10.1007/s12532-023-00239-3](https://doi.org/10.1007/s12532-023-00239-3)
@@ -29,3 +33,4 @@ A nonlinear kinetic parameter estimation problem originally described by [[5](#r
 4. Wilhelm, M. E. and Stuber, M.D. EAGO.jl: easy advanced global optimization in Julia. *Optimization Methods & Software.* 37(2), 425-450 (2022). DOI: [10.1080/10556788.2020.1786566](https://doi.org/10.1080/10556788.2020.1786566)
 5. Taylor, J.W. Direct measurement and analysis of cyclohexadienyl oxidation. Ph.D. thesis, Massachusetts Institute of Technology. (2005). URL: http://hdl.handle.net/1721.1/33716
 6. Wächter, A. and Biegler, L.T. On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming. *Mathematical Programming.* 106, 25-57 (2006). DOI: [10.1007/s10107-004-0559-y](https://doi.org/10.1007/s10107-004-0559-y)
+7. Pulsipher, J.L., Zhang, W., Hongisto, T.J., and Zavala, V.M. A unifying modeling abstraction for infinite-dimensional optimization. *Computers & Chemical Engineering.* 156, 107567 (2022). DOI: [10.1016/j.compchemeng.2021.107567](https://doi.org/10.1016/j.compchemeng.2021.107567)
