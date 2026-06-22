@@ -13,7 +13,7 @@
 module EOptInterface
 
     # Imports
-    import DocStringExtensions
+    import DocStringExtensions: TYPEDSIGNATURES
     import JuMP
     import ModelingToolkit
     import ModelingToolkit: t_nounits as t, D_nounits as D

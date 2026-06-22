@@ -13,7 +13,7 @@
 ################################################################################
 
 """
-    $(DocStringExtensions.TYPEDSIGNATURES)
+    $(TYPEDSIGNATURES)
 
 Returns the decision variables for an optimization problem from a 
 `ModelingToolkit.System`.
@@ -26,7 +26,7 @@ function decision_vars(sys::ModelingToolkit.System)
 end
 
 """
-    $(DocStringExtensions.TYPEDSIGNATURES)
+    $(TYPEDSIGNATURES)
 
 Automatically formulates and adds user-provided `Symbolics.Num` objective 
 function and `Vector{Symbolics.Num}` constraints from a `ModelingToolkit.System` 
@@ -47,13 +47,13 @@ function register_nlsystem(model::JuMP.Model, sys::ModelingToolkit.System, obj::
 end
 
 """
-    register_odesystem(model, sys, tspan, tstep, integrator)
+    $(TYPEDSIGNATURES)
 
 """
-    $(DocStringExtensions.TYPEDSIGNATURES)
 
-Automatically applies forward transcription and registers the discretized 
-ODE `ModelingToolkit.System` as algebraic JuMP constraints.
+Automatically applies specified direct transcription method and registers the 
+discretized ODE `ModelingToolkit.System` as algebraic JuMP constraints.
+Current supports Explicit Euler "EE" and Implicit Euler "IE".
 """
 function register_odesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
     if integrator != "EE" && integrator != "IE"
@@ -97,7 +97,7 @@ function register_odesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspa
 end
 
 """
-    $(DocStringExtensions.TYPEDSIGNATURES)
+    $(TYPEDSIGNATURES)
 
 Returns a dictionary of optimal solution values for the observed variables of a 
 `ModelingToolkit.System` if the `JuMP.Model` is solved.
