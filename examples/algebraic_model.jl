@@ -1,4 +1,7 @@
-using ModelingToolkit, JuMP, EAGO, EOptInterface
+using EAGO
+using EOptInterface
+using JuMP
+using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
 # Create algebraic ModelingToolkit system
@@ -163,14 +166,14 @@ xU = [100.0, 1.0, 1.0, 1.0, 100.0, 10.0]
 register_nlsystem(model, system, obj, [g1, g2])
 
 # Optimize model
-JuMP.optimize!(model)
+optimize!(model)
 
 # Display results
-println("Termination Status: $(JuMP.termination_status(model))")
-println("Primal Status: $(JuMP.primal_status(model))")
-println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
-println("f^* = $(round(JuMP.objective_value(model), digits=5))")
-println("x* = $(round.(JuMP.value.(x), digits=3))")
+println("Termination Status: $(termination_status(model))")
+println("Primal Status: $(primal_status(model))")
+println("Solve Time: $(round.(solve_time(model), digits=5))")
+println("f^* = $(round(objective_value(model), digits=5))")
+println("x* = $(round.(value.(x), digits=3))")
 
 # Retrieve full-space solution
 full_solution(model, system)
@@ -191,9 +194,9 @@ xU = vcat(repeat([100.0, 1.0, 1.0, 1.0], 12), 100.0, 10.0)
 register_nlsystem(full_model, full_system, obj, [g1, g2])
 
 # Optimize model and retrieve results
-JuMP.optimize!(full_model)
-println("Termination Status: $(JuMP.termination_status(full_model))")
-println("Primal Status: $(JuMP.primal_status(full_model))")
-println("Solve Time: $(round.(JuMP.solve_time(full_model), digits=5))")
-println("f^* = $(round(JuMP.objective_value(full_model), digits=5))")
-println("x* = $(round.(JuMP.value.(x), digits=3))")
+optimize!(full_model)
+println("Termination Status: $(termination_status(full_model))")
+println("Primal Status: $(primal_status(full_model))")
+println("Solve Time: $(round.(solve_time(full_model), digits=5))")
+println("f^* = $(round(objective_value(full_model), digits=5))")
+println("x* = $(round.(value.(x), digits=3))")

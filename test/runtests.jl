@@ -1,3 +1,5 @@
+using CSV
+using DataFrames
 using EOptInterface
 using Ipopt
 using JuMP
@@ -191,12 +193,11 @@ end
 
     @mtkcompile system = KineticParameterEstimation()
 
-    tspan = (0.0, 2.0)
-    tstep = 0.01
-    N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
-
-    include("kinetic_intensity_data.jl")
+    data = CSV.read("kinetic_intensity_data.csv", DataFrame)
     intensity(x_A, x_B, x_D) = x_A + 2/21*x_B + 2/21*x_D
+    tspan = (data.time[1], data.time[end])
+    tstep = data.time[2] - data.time[1]
+    N = length(data.time)
 
     model = JuMP.Model(Ipopt.Optimizer)
     V = length(unknowns(system))
@@ -209,7 +210,7 @@ end
 
     EOptInterface.register_odesystem(model, system, tspan, tstep, "EE")
 
-    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data.intensity[i])^2 for i in 1:N))
     JuMP.optimize!(model)
 
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
@@ -223,7 +224,7 @@ end
     pU = [1200.0, 1200.0, 40.0]
     JuMP.@variable(model, pL[i] <= p[i=1:3] <= pU[i])
     EOptInterface.register_odesystem(model, system, tspan, tstep, "IE")
-    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+    JuMP.@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data.intensity[i])^2 for i in 1:N))
     JuMP.optimize!(model)
 
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED

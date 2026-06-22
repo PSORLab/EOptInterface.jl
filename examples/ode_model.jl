@@ -1,4 +1,9 @@
-using ModelingToolkit, JuMP, Ipopt, EOptInterface
+using CSV
+using DataFrames
+using EOptInterface
+using Ipopt
+using JuMP
+using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
 # Create ModelingToolkit ODE system
@@ -41,15 +46,14 @@ end
 # Compile system
 @mtkcompile system = KineticParameterEstimation()
 
-# Define integration time span
-tspan = (0.0, 2.0)
-tstep = 0.01
-N = Int(floor((tspan[2] - tspan[1])/tstep)) + 1
-
 # Include experimental intensity data
-include("kinetic_intensity_data.jl")
+data = CSV.read("examples/kinetic_intensity_data.csv", DataFrame)
 # Define intensity function
 intensity(x_A, x_B, x_D) = x_A + 2/21*x_B + 2/21*x_D
+# Retrieve integration time data
+tspan = (data.time[1], data.time[end])
+tstep = data.time[2] - data.time[1]
+N = length(data.time)
 
 # Create JuMP model
 model = Model(Ipopt.Optimizer)
@@ -73,12 +77,12 @@ pU = [1200.0, 1200.0, 40.0]
 register_odesystem(model, system, tspan, tstep, "IE")
 
 # Define objective function
-@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data[i-1])^2 for i in 2:N))
+@objective(model, Min, sum((intensity(z[5,i], z[4,i], z[3,i]) - data.intensity[i])^2 for i in 1:N))
 
 # Optimize model and retrieve results
-JuMP.optimize!(model)
-println("Termination Status: $(JuMP.termination_status(model))")
-println("Primal Status: $(JuMP.primal_status(model))")
-println("Solve Time: $(round.(JuMP.solve_time(model), digits=5))")
-println("f^* = $(round(JuMP.objective_value(model), digits=5))")
-println("p* = $(round.(JuMP.value.(p), digits=3))")
+optimize!(model)
+println("Termination Status: $(termination_status(model))")
+println("Primal Status: $(primal_status(model))")
+println("Solve Time: $(round.(solve_time(model), digits=5))")
+println("f^* = $(round(objective_value(model), digits=5))")
+println("p* = $(round.(value.(p), digits=3))")
