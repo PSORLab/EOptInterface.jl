@@ -49,8 +49,6 @@ end
 """
     $(TYPEDSIGNATURES)
 
-"""
-
 Automatically applies specified direct transcription method and registers the 
 discretized ODE `ModelingToolkit.System` as algebraic JuMP constraints.
 Current supports Explicit Euler "EE" and Implicit Euler "IE".
