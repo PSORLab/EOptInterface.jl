@@ -282,7 +282,7 @@ end
     pU = [1200.0, 1200.0, 40.0]
     JuMP.@variable(model, pL[i] <= p[i=1:3] <= pU[i])
 
-    EOptInterface.register_odesystem(model, system)
+    EOptInterface.register_odesystem(model, system, τ)
 
     JuMP.@objective(model, Min, sum((intensity(z[5](i), z[4](i), z[3](i)) - data.intensity[findfirst(==(i), data.time)])^2 for i in supports(τ)))
     JuMP.optimize!(model)
