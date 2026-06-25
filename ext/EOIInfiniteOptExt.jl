@@ -28,8 +28,7 @@ module EOIInfiniteOptExt
     Automatically registers ODEs from a `ModelingToolkit.System` as 
     InfiniteOpt constraints.
     """
-    function EOptInterface.register_odesystem(model::InfiniteOpt.InfiniteModel, sys::ModelingToolkit.System)
-        t = InfiniteOpt.all_parameters(model, InfiniteOpt.InfiniteParameter)[1]
+    function EOptInterface.register_odesystem(model::InfiniteOpt.InfiniteModel, sys::ModelingToolkit.System, t::InfiniteOpt.GeneralVariableRef)
         # Number of ODE variables
         V = length(ModelingToolkit.unknowns(sys))
         param_dict = copy(ModelingToolkit.initial_conditions(sys).dict)
