@@ -1,14 +1,14 @@
 #
 # Small DAE registration example
 #
-# This script shows the low-level DAE path:
+# This script shows direct DAE registration:
 # 1. build a tiny DAE that stays a DAE after `structural_simplify`,
 # 2. register it with different integrators,
 # 3. solve the resulting JuMP models,
 # 4. save the summaries to CSV files.
 #
-# This example is for users who want to understand the DAE registration layer
-# directly, without the extra controller machinery used by tracking MPC.
+# This example is for users who want to call `register_daesystem(...)` directly,
+# without building a tracking-MPC experiment around it.
 # The point is not process realism.
 # The point is to show:
 # - what kind of DAE the package expects,

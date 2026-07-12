@@ -12,9 +12,9 @@ Documentation for [EOptInterface](https://github.com/joseph03choi/EOptInterface.
 
 ## Scope
 
-`EOptInterface` provides the low-level ModelingToolkit-to-JuMP registration
-layer together with reusable MPC helpers extracted from the active wastewater,
-ADM1, and desalination control projects in the shared `Research` directory.
+`EOptInterface` connects ModelingToolkit models to JuMP optimization models.
+The examples focus on small algebraic/ODE/DAE registrations and reproducible
+MPC/DMC runs drawn from wastewater and process-control case studies.
 
 ```@contents
 Pages = ["index.md", "mpc_module.md"]

@@ -4,8 +4,8 @@
 Build callable Julia functions for each dynamic equation in a
 `ModelingToolkit.System`.
 
-This is a low-level helper.
-Most package users will not call it directly.
+Most users will not call this directly. It is useful when the raw residual
+functions are needed for inspection or a custom experiment.
 Its job is:
 
 1. expand the MTK equations,
@@ -14,7 +14,7 @@ Its job is:
 4. build one executable function per equation.
 
 The returned vector is useful when you want to inspect or reuse the raw model
-equations outside the higher-level MPC builders.
+equations outside the standard tracking MPC workflow.
 """
 function mtk_generate_model_equations(sys::ModelingToolkit.System)
     param_dict = copy(ModelingToolkit.defaults(sys))

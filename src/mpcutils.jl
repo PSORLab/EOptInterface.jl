@@ -1,24 +1,17 @@
+# Helper routines used by the MPC examples.
 #
-# Shared MPC utilities
-#
-# This file holds helper functions used by both tracking MPC and DMC.
-# It covers naming, state trajectories, warm starts, logging, and debugging.
-# These functions are not the main "controller builder" functions, but they are
-# the glue that makes the higher-level MPC code easier to write and debug.
-# New users often underestimate this file. In practice, it answers many of the
-# day-to-day engineering questions:
-# - How do I name JuMP variables in a readable way?
-# - How do I build one state trajectory per MTK state?
-# - How do I warm start the next solve?
-# - How do I log plant data, predictions, and objective terms?
-# - How do I inspect what happened after an MPC run?
+# Most users do not need to read this file first. The main scientific workflow
+# is in `trackingmpc.jl` and the examples. The functions here handle practical
+# tasks that come up during a closed-loop run: naming JuMP variables, copying
+# measured states into initial-condition constraints, warm-starting controls,
+# logging trajectories, and inspecting a JuMP model when a solve looks wrong.
 
 """
     dump_all_constraints(model)
 
-Print the constraint types in a JuMP model.
-Then print each constraint.
-Use this for debugging.
+Print all JuMP constraints in a model.
+
+This is a debugging aid for small models, not part of the normal MPC workflow.
 """
 function dump_all_constraints(model::JuMP.Model)
     println("==== Constraint types & counts ====")
@@ -40,10 +33,7 @@ end
 """
     _constraint_uses_any_var(func, target_idxs, target_names)
 
-Internal helper used by `find_constraints_with_vars(...)`.
-
-It checks whether one JuMP or MOI function uses any of the target variables.
-It works for plain variables, affine functions, and quadratic functions.
+Check whether a JuMP/MOI expression contains one of the variables of interest.
 """
 function _constraint_uses_any_var(func, target_idxs::Set, target_names::Set{String})
     if func isa JuMP.VariableRef
@@ -64,8 +54,10 @@ end
 """
     find_constraints_with_vars(model, vars; constraint_sets=(MOI.EqualTo{Float64},), verbose=true)
 
-Return the constraints that use any variable in `vars`.
-Use this when you want to see where a JuMP variable appears.
+Return constraints that contain one of the variables in `vars`.
+
+This is useful when a state or control appears to be fixed by an unexpected
+constraint.
 """
 function find_constraints_with_vars(model::JuMP.Model,
                                     vars::AbstractVector{<:JuMP.VariableRef};
@@ -117,7 +109,7 @@ end
 """
     sanitize_mpc_name(sym)
 
-Convert an MTK symbol or label into a JuMP-safe base name.
+Convert a ModelingToolkit symbol or label into a safe JuMP name.
 
 Examples:
 - `reactor1₊S_O(t)` -> `"reactor1_S_O"`
@@ -197,7 +189,7 @@ _as_num(sym)::Num = sym isa Num ? sym : Num(sym)
 """
     _root_symbol_prefix(sys)
 
-Internal helper that returns the MTK root-name prefix for a system.
+Return the MTK root-name prefix for a system.
 
 For example, if the system name is `sys`, this function returns `"sys₊"`.
 It is used when the package tries to match `sys.x` with the unprefixed symbol
@@ -213,10 +205,9 @@ end
 """
     _system_symbol_aliases(sys, sym)
 
-Internal helper that builds a list of valid string aliases for one MTK symbol.
+Build a list of valid string aliases for one MTK symbol.
 
-This is used by the canonical-symbol layer so the package can accept both
-prefixed and unprefixed names.
+This lets the code accept both prefixed and unprefixed MTK names.
 """
 function _system_symbol_aliases(sys, sym)::Vector{String}
     aliases = String[string(sym)]
@@ -237,8 +228,7 @@ end
 """
     _system_symbol_lookup(sys, pool)
 
-Internal helper that builds the string-to-symbol lookup table used by
-`canonical_system_symbol(...)`.
+Build the string-to-symbol lookup table used by `canonical_system_symbol(...)`.
 
 `pool` decides whether the lookup is built from unknowns, parameters, or both.
 """
@@ -331,9 +321,9 @@ end
 """
     _split_path_and_state(var)
 
-Small internal wrapper around `split_mtk_state_path(...)`.
+Return the subsystem path and terminal state name for one variable.
 
-It keeps the rest of this file readable when several path helpers are chained.
+This keeps the path-handling code short in the functions below.
 """
 function _split_path_and_state(var)
     return split_mtk_state_path(var)
@@ -551,7 +541,7 @@ end
 """
     _apply_value_clips(value; lower_clip=nothing, upper_clip=nothing)
 
-Internal helper that clips one numeric value to optional lower and upper limits.
+Clip one numeric value to optional lower and upper limits.
 
 This is used when the current plant state is copied into MPC initial conditions.
 """
@@ -1014,7 +1004,7 @@ end
 """
     _time_index(times, target; match=:nearest, atol=1e-8)
 
-Internal helper that finds the index of a target time in a logged time vector.
+Find the index of a target time in a logged time vector.
 
 Use `match=:nearest` for the closest entry or `match=:exact` when you want the
 time to match within a tolerance.
@@ -1092,8 +1082,7 @@ end
 """
     _affexpr_var_coeff_pairs(func)
 
-Internal helper that extracts `(variable, coefficient)` pairs from a
-`JuMP.AffExpr`.
+Extract `(variable, coefficient)` pairs from a `JuMP.AffExpr`.
 
 This is used by the constraint-audit functions later in this file.
 """
@@ -1131,7 +1120,7 @@ end
 """
     _single_var_from_affexpr(func)
 
-Internal helper for the audit functions.
+Return the one variable term from an affine expression when it has exactly one.
 
 If an affine expression contains exactly one variable term, this returns that
 variable and its coefficient. Otherwise it returns `(nothing, 0.0)`.

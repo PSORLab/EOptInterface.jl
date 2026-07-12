@@ -1,105 +1,28 @@
-# MPC Module
+# Tracking MPC With EOptInterface
 
-`EOptInterface` exposes two public MPC workflows.
+This page explains the ModelingToolkit-to-JuMP MPC workflow used by the
+examples in this repository. It is written as a reproducible research note:
+what model is used, what the controller changes, what output is tracked, and
+what gets updated at each sampling time.
 
-- `build_tracking_mpc(...)`
-  Use this when your prediction model is a `ModelingToolkit` ODE or DAE system.
+## Basic Workflow
 
-- `register_dmcsystem(...)`
-  Use this when your prediction model is already a numeric step response and you want a classic DMC block.
+For a mechanistic plant model, the normal workflow is:
 
-This page is written for public users who are comfortable reading beginner-to-intermediate Julia code.
+1. write the plant in `ModelingToolkit`;
+2. choose manipulated variables, such as aeration or flow rate;
+3. choose tracked outputs and setpoints;
+4. build one JuMP MPC problem;
+5. during simulation, update the current state and solve again.
 
-## Five-Minute Mental Model
+The main functions are:
 
-The package separates MPC work into three layers.
+- `build_tracking_mpc(...)`: build the JuMP prediction and tracking problem;
+- `solve_tracking_mpc!(...)`: update the current state, solve, and read back the first control move;
+- `update_stage_parameter!(...)`: update a disturbance or feed preview;
+- `update_tracking_targets!(...)`: change setpoints or soft bounds during a run.
 
-### Layer 1: Model Registration
-
-This layer turns a dynamic model into JuMP variables and constraints.
-
-Examples:
-
-- `register_odesystem(...)`
-- `register_daesystem(...)`
-- `register_dmcsystem(...)`
-
-If you are new, think of this as:
-
-`dynamic model` -> `optimization-ready prediction equations`
-
-### Layer 2: Controller Builder
-
-This layer adds the controller-specific pieces:
-
-- manipulated inputs
-- tracked outputs
-- setpoints
-- move penalties
-- soft constraints
-- control-horizon hold rules
-
-The main public function here is:
-
-- `build_tracking_mpc(...)`
-
-### Layer 3: Online Solve Loop
-
-This layer updates the reusable controller before each MPC solve:
-
-- copy in the newest plant state
-- copy in the previously applied input
-- optionally update disturbance previews
-- optionally update setpoints
-- solve the JuMP model
-- read back the first move and the predicted trajectories
-
-The main public functions here are:
-
-- `prepare_tracking_mpc_step!(...)`
-- `solve_tracking_mpc!(...)`
-
-## Which API Should You Use?
-
-| Situation | Best starting API |
-| --- | --- |
-| You already have a `ModelingToolkit` ODE or DAE plant | `build_tracking_mpc(...)` |
-| You already have a numeric step response | `register_dmcsystem(...)` |
-| You want to log states, predictions, and objective terms during a closed-loop run | `make_mpc_log(...)` and the related logging helpers |
-
-Rule of thumb:
-
-- If your plant is mechanistic and nonlinear, start with tracking MPC.
-- If your plant is already reduced to step-response data, start with DMC.
-
-## Direct-Transcription Tracking MPC
-
-The modern MPC path in this package is direct transcription.
-
-That means the package:
-
-1. creates one decision trajectory for each selected state,
-2. creates one decision trajectory for each control input,
-3. creates any stage-wise parameter trajectories you want to preview,
-4. writes the discretized model equations into JuMP,
-5. adds the tracking objective and MPC-specific constraints.
-
-The same JuMP model is then reused at every control step.
-
-That reuse is important.
-It is the reason the online MPC loop is fast enough to be practical.
-You build once, then only update values between solves.
-
-## Public Tracking-MPC Workflow
-
-The normal order is:
-
-1. define the plant with `ModelingToolkit`,
-2. define controls with `MPCControlSpec`,
-3. define outputs with `MPCOutputSpec`,
-4. choose horizons and solver settings with `TrackingMPCConfig`,
-5. build the controller with `build_tracking_mpc(...)`,
-6. solve online with `solve_tracking_mpc!(...)`.
+The DMC step-response path is separate and starts from `register_dmcsystem(...)`.
 
 ## Minimal Example
 
@@ -155,92 +78,43 @@ ctrl = build_tracking_mpc(
 )
 
 result = solve_tracking_mpc!(ctrl, Dict(sys.x => 0.0), Dict(sys.u => 0.0))
+u_apply = result.controls[sys.u][1]
 ```
 
-What comes back in `result`:
+`result.controls` contains the optimized input trajectory.
+`result.predictions` contains the predicted states.
+`result.metrics` contains objective terms that are useful for reports.
 
-- `result.controls`
-  The optimized control trajectories.
+## Meaning of the Main Settings
 
-- `result.predictions`
-  The predicted state trajectories.
+`MPCControlSpec` describes one manipulated variable.
 
-- `result.metrics`
-  Scalar objective terms, such as tracking cost and move cost.
+- `sym`: the ModelingToolkit symbol used as the control input;
+- `lower`, `upper`: hard bounds;
+- `delta_max`: maximum move between samples;
+- `move_weight`: penalty on input movement over the horizon;
+- `first_move_weight`: penalty on changing from the previously applied input.
 
-## What `MPCControlSpec` Means
+`MPCOutputSpec` describes one tracked output.
 
-Each `MPCControlSpec` describes one manipulated variable.
+- `sym`: state or algebraic quantity to track;
+- `setpoint`: target value;
+- `track_weight`: tracking-error weight;
+- `terminal_weight`: extra weight on the final predicted point;
+- `lower_soft`, `upper_soft`, `slack_weight`: optional soft operating zone.
 
-Important fields:
+`TrackingMPCConfig` holds the numerical settings.
 
-- `sym`
-  Which `ModelingToolkit` parameter or variable is the control input.
+- `PH`: prediction horizon length;
+- `CH`: number of free control moves;
+- `dt`: sample time;
+- `integrator`: transcription rule, such as `"IE"` or `"RK4"`;
+- `system_kind`: `:ode` or `:dae`;
+- `state_lower`, `state_upper`: default state bounds.
 
-- `lower`, `upper`
-  Hard bounds on the control.
+## Closed-Loop Use
 
-- `delta_max`
-  Maximum change allowed between consecutive control moves.
-
-- `move_weight`
-  Penalty on move size after the first move.
-
-- `first_move_weight`
-  Penalty on the difference between the first optimized move and the previously applied move.
-
-## What `MPCOutputSpec` Means
-
-Each `MPCOutputSpec` describes one tracked output.
-
-Important fields:
-
-- `sym`
-  Which state or algebraic quantity is being tracked.
-
-- `setpoint`
-  The desired target value.
-
-- `track_weight`
-  Weight on normal tracking error over the horizon.
-
-- `terminal_weight`
-  Extra weight on the final prediction stage.
-
-- `lower_soft`, `upper_soft`
-  Optional soft-zone bounds.
-
-- `slack_weight`
-  Cost on violating the soft-zone bounds.
-
-## What `TrackingMPCConfig` Means
-
-This struct holds the shared controller settings.
-
-Important fields:
-
-- `PH`
-  Prediction horizon length in stages.
-
-- `CH`
-  Number of free control moves.
-  After this point the controller holds the last move constant.
-
-- `dt`
-  Sample time used by the prediction model.
-
-- `integrator`
-  Low-level transcription rule such as `"IE"` or `"RK4"`.
-
-- `system_kind`
-  `:ode` or `:dae`.
-
-- `state_lower`, `state_upper`
-  Default state bounds used when building state trajectories.
-
-## Online Update Pattern
-
-Inside a callback or a receding-horizon loop, the usual order is:
+Inside a simulation callback or a hand-written loop, the repeated step is:
 
 ```julia
 state_values = current_state_map(integ, sys)
@@ -250,116 +124,48 @@ result = solve_tracking_mpc!(ctrl, state_values, Dict(sys.u => integ.ps[sys.u]))
 u_apply = result.controls[sys.u][1]
 ```
 
-This is the core idea:
+The JuMP model is not rebuilt at each sample. Only the current state,
+previously applied input, setpoints, and previews are updated.
 
-- the controller object stays the same,
-- only the data inside the controller changes.
-
-If you want live terminal output while the loop is running, call:
+For a simple live line while the controller runs:
 
 ```julia
-result = solve_tracking_mpc!(ctrl, state_values, previous_controls; show_status = true)
+result = solve_tracking_mpc!(
+    ctrl,
+    state_values,
+    previous_controls;
+    show_status = true,
+)
 ```
 
-Scenario-specific examples can layer extra status lines on top of this without
-changing the package-level API. The NDMC example does exactly that.
+The NDMC notebook adds its own status line with the variables used in that
+case. That extra printing is part of the example, not a different controller.
 
-## When To Use `prepare_tracking_mpc_step!`
+## DAE and DMC Notes
 
-`solve_tracking_mpc!(...)` is the easiest full workflow.
+Use `TrackingMPCConfig(system_kind = :dae)` when the prediction model includes
+algebraic equations that should remain in the optimization problem. The small
+DAE example is `examples/dae_registration_demo.jl`.
 
-Use `prepare_tracking_mpc_step!(...)` when you want more manual control.
-
-For example:
-
-- you want to inspect the JuMP model before solving,
-- you want to call `optimize!(ctrl.model)` yourself,
-- you want to change solver settings between solves.
-
-## DAE Path
-
-Set:
-
-```julia
-TrackingMPCConfig(system_kind = :dae)
-```
-
-This routes the controller through `register_daesystem(...)` instead of `register_odesystem(...)`.
-
-Use this when algebraic equations must remain inside the prediction model.
-
-The smallest low-level DAE registration example is:
-
-- `examples/dae_registration_demo.jl`
-
-The matching notebook is:
-
-- `notebooks/dae_registration_simple.ipynb`
-
-## DMC Path
-
-`register_dmcsystem(...)` is the step-response path.
-
-Use it when:
-
-- you already have a step response,
-- you do not want to carry a full mechanistic `ModelingToolkit` model,
-- you want a lighter classic DMC formulation.
-
-The smallest example is:
-
-- `examples/dmc_registration_demo.jl`
-
-## Logging Helpers
-
-For closed-loop work, the public logging helpers are:
-
-- `make_mpc_log(...)`
-- `seed_mpc_log!(...)`
-- `log_mpc_state!(...)`
-- `record_mpc_prediction!(...)`
-- `record_mpc_metrics!(...)`
-
-These helpers do not solve MPC by themselves.
-They only record what happened during a run.
-
-That separation is intentional.
-It keeps the controller logic and the reporting logic independent.
-
-Live status printing is separate again:
-
-- `solve_tracking_mpc!(...; show_status=true)` prints a compact generic line;
-- examples or notebooks can add scenario-specific wrappers when they need extra
-  fields that are not part of the general API.
+Use `register_dmcsystem(...)` when the plant has already been reduced to step
+responses and a classic DMC formulation is enough. The small DMC example is
+`examples/dmc_registration_demo.jl`.
 
 ## Suggested Reading Order
 
-If you are completely new, read in this order:
+For the tracking-MPC path:
 
-1. `examples/tracking_mpc_demo.jl`
-2. this page
-3. `src/trackingmpc.jl`
-4. `src/mpcutils.jl`
-5. `examples/ndmc_conductivity_mpc_demo.jl`
+1. `examples/tracking_mpc_demo.jl`;
+2. this page;
+3. `src/trackingmpc.jl`;
+4. `examples/ndmc_conductivity_mpc_demo.jl` or the NDMC notebook.
 
-If you want the DMC path instead:
+The NDMC case now has one repository implementation:
+`examples/NDMCExample.jl` loads the model and simulation code from
+`examples/ndmc_case.jl` and the plotting code from `examples/ndmc_plots.jl`.
+The repository notebook,
+`notebooks/ndmc_conductivity_mpc_simple.ipynb`, runs the same case.
 
-1. `examples/dmc_registration_demo.jl`
-2. `src/dmcutils.jl`
-
-If you want the low-level model-registration layer:
-
-1. `src/userfuncs.jl`
-2. `examples/ode_model.jl`
-3. `examples/dae_registration_demo.jl`
-
-## Practical Notes
-
-- `CH` means the number of free moves, not the number of total stages.
-- Soft bounds only matter when `slack_weight > 0`.
-- Stage parameters are stored as fixed JuMP variables so they can be updated online without rebuilding the optimization model.
-- The logging helpers work for both direct-transcription MPC and DMC.
-
-## One-Sentence Summary
-
-If you have a mechanistic `ModelingToolkit` plant, start with `build_tracking_mpc(...)`; if you have a numeric step response, start with `register_dmcsystem(...)`; in both cases, the package is designed so you build once and update online many times.
+For debugging a failed solve, the helper routines in `src/mpcutils.jl` can
+print constraints, check initial-condition synchronization, and record MPC
+predictions. They are supporting tools, not the main controller definition.

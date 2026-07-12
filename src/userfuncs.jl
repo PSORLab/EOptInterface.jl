@@ -1,12 +1,9 @@
 ﻿# ------------------------------------------------------------------------------
-# Low-level MPC helpers
+# ModelingToolkit-to-JuMP registration routines
 #
 # This file turns a ModelingToolkit system into a JuMP model.
-# Most users will not call these functions directly.
-# The higher-level builder in `trackingmpc.jl` calls them.
-# If you are new to the package, think of this file as the "model registration"
-# layer. Its job is not to choose controls or solve the online loop. Its job is
-# to take one MTK model and write the matching JuMP variables and constraints.
+# It does not choose controls or run the online loop. It takes one MTK model
+# and writes the matching JuMP variables and constraints.
 #
 # Main flow:
 # 1. `decision_vars(...)` picks the MTK symbols used in the problem.
@@ -29,8 +26,8 @@
 """
     _canonical_parameter_var_dict(sys, data)
 
-Internal helper that rewrites a dictionary so all keys are the standard
-parameter symbols from `parameters(sys)`.
+Rewrite a dictionary so all keys are the standard parameter symbols from
+`parameters(sys)`.
 
 This matters because users may pass different but equivalent MTK names.
 The rest of the package wants one consistent key form before it writes JuMP
@@ -48,8 +45,8 @@ end
 """
     _canonical_state_var_dict(sys, data)
 
-Internal helper that rewrites a dictionary so all keys are the standard state
-symbols from `unknowns(sys)`.
+Rewrite a dictionary so all keys are the standard state symbols from
+`unknowns(sys)`.
 
 This is the state-side companion to `_canonical_parameter_var_dict(...)`.
 It keeps later IC and trajectory updates keyed by one canonical MTK symbol set.

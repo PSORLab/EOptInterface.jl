@@ -27,7 +27,7 @@ M = 2
 
 # Plain JuMP model for the DMC block.
 # DMC registration only needs an ordinary JuMP model.
-# It does not need the high-level tracking MPC builder.
+# It does not need the tracking-MPC setup used for mechanistic ODE/DAE models.
 model = Model()
 
 # Register the DMC prediction block.

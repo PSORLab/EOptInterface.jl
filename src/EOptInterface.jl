@@ -1,37 +1,24 @@
 module EOptInterface
 
-# This is the package entry point.
-# It does three simple things:
-# 1. load the source files with `include(...)`;
-# 2. decide which names are public through `export`;
-# 3. present one cleaner surface to users, examples, and notebooks.
-#
-# If you are new to the package, you usually do not start by reading this file
-# line by line. Instead, use it as a map:
-# - `userfuncs.jl` contains the low-level ODE/DAE registration layer;
-# - `mpcutils.jl` contains naming, warm start, logging, and debugging helpers;
-# - `trackingmpc.jl` contains the high-level tracking MPC builder and online
-#   solve loop;
-# - `dmcutils.jl` contains the lighter DMC path based on step responses.
-#
-# The export list below is important because it tells you which functions are
-# meant to be used directly by outside users. Many internal helpers are not
-# exported on purpose.
+# Load the small set of files used by the examples and notebooks.
+# The main research workflow is:
+# - register a ModelingToolkit model in JuMP (`userfuncs.jl`);
+# - build and run a tracking MPC problem (`trackingmpc.jl`);
+# - use helper routines for warm starts, logs, and diagnostics (`mpcutils.jl`);
+# - optionally use a step-response DMC model (`dmcutils.jl`).
 
-# ---- imports ----
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
 using JuMP
 
-# ---- includes ----
 include("basefuncs.jl")
 include("userfuncs.jl")
 include("mpcutils.jl")
 include("trackingmpc.jl")
 include("dmcutils.jl")
 
-# ---- exports ----
+# Names used directly by the examples, notebooks, and tests.
 export build_state_trajs_from_vars!, build_tracking_mpc, check_ic_sync,
        canonical_system_parameter, canonical_system_symbol,
        canonical_system_unknown, canonicalize_system_symbols,

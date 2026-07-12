@@ -1,39 +1,25 @@
+# Tracking MPC for ModelingToolkit plants.
 #
-# Tracking MPC helpers
+# The code below follows the same order used in a closed-loop experiment:
+# 1. choose the manipulated inputs and measured outputs;
+# 2. build one JuMP prediction problem from the ModelingToolkit model;
+# 3. at each sample time, write the current plant state into that problem;
+# 4. solve the MPC problem and apply the first control move.
 #
-# This file builds and runs the high-level MPC interface.
-# It sits on top of the lower-level functions in `userfuncs.jl`.
-# It also uses shared helpers from `mpcutils.jl`.
-# If `userfuncs.jl` is the "write the dynamic equations into JuMP" layer, then
-# this file is the "run MPC like a user would run it" layer.
-# In other words:
-# - `userfuncs.jl` writes the math problem;
-# - this file builds the controller object and drives the repeated online solve.
-#
-# Reading order:
-# 1. `MPCControlSpec`, `MPCOutputSpec`, `TrackingMPCConfig`
-# 2. `build_tracking_mpc(...)`
-# 3. `update_tracking_targets!(...)` and `update_stage_parameter!(...)`
-# 4. `prepare_tracking_mpc_step!(...)`
-# 5. `solve_tracking_mpc!(...)`
-#
-# Suggested mental model for new users:
-# - `build_tracking_mpc(...)` happens once at setup time;
+# The public functions keep this workflow explicit:
+# - `build_tracking_mpc(...)` creates the JuMP MPC problem once;
 # - `update_tracking_targets!(...)` and `update_stage_parameter!(...)` change
-#   references or previews between solves;
-# - `prepare_tracking_mpc_step!(...)` copies the newest plant state into the
-#   existing JuMP model;
-# - `solve_tracking_mpc!(...)` solves that updated model and reads back the
-#   first move and the predictions.
+#   setpoints or disturbance previews between solves;
+# - `solve_tracking_mpc!(...)` performs one online MPC update.
 
 """
     MPCControlSpec
 
-User-facing control definition for the tracking MPC builder.
+One manipulated input in the MPC problem.
 
-Each instance describes one manipulated variable.
-The builder later turns it into a JuMP control trajectory, move limits, and
-move penalties.
+For example, this could be an aeration rate, recycle flow, or any model
+parameter that the controller is allowed to change. The fields give its bounds,
+move limit, and move penalty.
 """
 Base.@kwdef struct MPCControlSpec
     sym::Num
@@ -48,10 +34,11 @@ end
 """
     MPCOutputSpec
 
-Tracked output definition for the tracking MPC builder.
+One output that the MPC tries to keep near a target.
 
-`lower_soft` and `upper_soft` create soft limits when `slack_weight` is
-positive.
+The output can have a setpoint and optional soft lower/upper limits. Soft
+limits are penalized through `slack_weight` instead of making the solve fail
+immediately.
 """
 Base.@kwdef struct MPCOutputSpec
     sym::Num
@@ -67,10 +54,10 @@ end
 """
     TrackingMPCConfig
 
-Shared settings for the tracking MPC builder.
+Basic numerical settings for one tracking MPC experiment.
 
-This struct sets the horizon lengths, sample time, model type, and default
-state bounds.
+`PH` is the prediction horizon, `CH` is the number of free control moves, and
+`dt` is the sample time used in the prediction model.
 """
 Base.@kwdef struct TrackingMPCConfig
     PH::Int = 20
@@ -92,10 +79,10 @@ end
 """
     TrackingMPCController
 
-Reusable MPC bundle.
+Stored MPC problem used during closed-loop simulation.
 
-It stores the JuMP model, the state and control trajectories, the initial
-condition constraints, and the data needed for repeated online solves.
+Users normally create this with `build_tracking_mpc(...)` and then pass it to
+`solve_tracking_mpc!(...)` at each sampling time.
 """
 mutable struct TrackingMPCController
     cfg::TrackingMPCConfig
@@ -130,10 +117,9 @@ end
 """
     _resolved_base_name(sym, custom, suffix)
 
-Internal helper that builds the JuMP base name for one MPC variable family.
+Build the JuMP base name for one MPC variable family.
 
-It is a thin wrapper around `resolve_mpc_base_name(...)`.
-The builder uses it for controls, outputs, and stage parameters.
+The code uses the same naming rule for controls, outputs, and stage parameters.
 """
 function _resolved_base_name(sym, custom::Union{Nothing, String}, suffix::AbstractString)::String
     return resolve_mpc_base_name(sym; custom=custom, suffix=suffix)
@@ -142,8 +128,8 @@ end
 """
     _metric_key(prefix, label)
 
-Internal helper that builds a metric key for the `metrics` dictionary returned
-by `solve_tracking_mpc!(...)`.
+Build a metric key for the `metrics` dictionary returned by
+`solve_tracking_mpc!(...)`.
 
 Examples are keys such as `:track_C1_y` or `:move_Q_air_u`.
 """
@@ -154,7 +140,7 @@ end
 """
     _canonical_bound_spec(sys, spec, pool)
 
-Internal helper that normalizes bound dictionaries onto the standard MTK keys.
+Normalize bound dictionaries onto the standard MTK keys.
 
 If `spec` is not a dictionary, it is returned unchanged.
 This is used when `build_tracking_mpc(...)` receives state bounds or initial
@@ -175,8 +161,7 @@ end
 """
     _canonical_value_map(sys, values, pool)
 
-Internal helper that converts an input dictionary to a `Num => Float64` map
-with standard MTK keys.
+Convert an input dictionary to a `Num => Float64` map with standard MTK keys.
 
 This is used before writing current plant values or previous controls into the
 MPC model.
@@ -193,8 +178,7 @@ end
 """
     _store_result_alias!(dest, original, canonical, value)
 
-Internal helper that stores one result under both the user-facing key and the
-standard key.
+Store one result under both the user-facing key and the standard key.
 
 This makes the returned `controls` and `predictions` dictionaries easier to use.
 """
@@ -210,7 +194,7 @@ end
 """
     _stage_values(values, N, label)
 
-Internal helper that turns one stage-parameter input into a length-`N` vector.
+Turn one stage-parameter input into a length-`N` vector.
 
 It accepts scalars, tuples, and vectors.
 This is used by `build_tracking_mpc(...)` and `update_stage_parameter!(...)`.
@@ -232,8 +216,7 @@ end
 """
     _validate_unique_syms(sys, specs, pool, label)
 
-Internal helper that checks whether a list of control or output specs contains
-duplicate MTK symbols.
+Check whether a list of control or output specs contains duplicate MTK symbols.
 
 `build_tracking_mpc(...)` uses this before any JuMP variables are created.
 """
@@ -250,7 +233,7 @@ end
 """
     _value_or_float(x)
 
-Internal helper that returns a plain `Float64`.
+Return a plain `Float64`.
 
 If `x` is already numeric, it is converted directly.
 If `x` is a JuMP expression, the helper reads its current value.
@@ -262,14 +245,14 @@ end
 """
     _register_tracking_system!(cfg, model, sys, p_disc, p_disc_vars, x_vars, t_stage)
 
-Internal helper that chooses the low-level model-registration path.
+Add the ODE or DAE prediction equations to the JuMP model.
 
 It calls:
 - `register_odesystem(...)` when `system_kind = :ode`
 - `register_daesystem(...)` when `system_kind = :dae`
 
-`build_tracking_mpc(...)` uses this after the state, control, and stage
-trajectories have been created.
+`build_tracking_mpc(...)` calls this after the state, control, and stage
+trajectories are in place.
 """
 function _register_tracking_system!(ctrl::TrackingMPCConfig,
                                     model::JuMP.Model,
@@ -317,14 +300,13 @@ end
 """
     build_tracking_mpc(model, sys; control_specs, output_specs, config=..., stage_param_defaults=...)
 
-Build a reusable tracking MPC around a ModelingToolkit ODE or DAE system.
+Build one tracking MPC problem around a ModelingToolkit ODE or DAE system.
 
 This function builds the JuMP model once.
 It adds state trajectories, control trajectories, optional preview parameters,
 tracking terms, and move penalties.
 
-This is the main setup function for tracking MPC.
-If you only remember one builder in this file, it should be this one.
+This is the main setup function for the tracking MPC examples.
 
 What this function creates:
 - one JuMP trajectory for each model state;
@@ -332,13 +314,13 @@ What this function creates:
 - optional stage-wise preview trajectories, such as disturbances or prices;
 - one objective made of tracking penalties, soft-bound penalties, and move
   penalties;
-- one `TrackingMPCController` object that stores all important JuMP references.
+- one `TrackingMPCController` value that stores the JuMP references needed
+  during simulation.
 
-Why the controller object matters:
+Why this matters during simulation:
 - the expensive model construction happens once here;
 - later online MPC steps only update values and re-solve;
-- this is much faster and cleaner than rebuilding the full JuMP model each
-  time.
+- this avoids rebuilding the full JuMP model at every sample.
 
 Algorithm:
 1. Check horizon settings, control specifications, and output specifications.
@@ -616,7 +598,7 @@ end
 """
     _trajectory_base_name(traj)
 
-Internal helper that returns the base JuMP name for one trajectory vector.
+Return the base JuMP name for one trajectory vector.
 
 If the first variable is named `x[1]`, this returns `x`.
 This is used by the trajectory query helpers.
@@ -631,7 +613,7 @@ end
 """
     _tracking_aliases(ctrl, sym, traj, kind)
 
-Internal helper that builds the list of names that can refer to one trajectory.
+Build the list of names that can refer to one trajectory.
 
 It includes MTK names, display names, sanitized names, and the stored public
 base names.
@@ -656,7 +638,7 @@ end
 """
     _resolve_tracking_query(ctrl, query, kind)
 
-Internal helper used by `state_traj`, `control_traj`, and `stage_param_traj`.
+Convert a state, control, or stage-parameter query into one standard MTK symbol.
 
 It turns a user query into one standard MTK symbol.
 The query can be:
@@ -732,7 +714,7 @@ end
 """
     _tracking_selected_syms(ctrl, queries, kind)
 
-Internal helper for `print_tracking_status(...)`.
+Choose which output or control symbols appear in `print_tracking_status(...)`.
 
 It decides which output or control symbols should appear in the printed status
 line.
@@ -764,7 +746,7 @@ end
 """
     _format_tracking_scalar(value; digits=3)
 
-Internal helper that formats one number for status printing.
+Format one number for status printing.
 
 It prints `NaN` cleanly and rounds ordinary numbers to a small number of digits.
 """
@@ -775,8 +757,7 @@ end
 """
     _tracking_state_snapshot(ctrl, state_values)
 
-Internal helper that normalizes one `state => value` dictionary onto the
-standard MTK state keys.
+Normalize one `state => value` dictionary onto the standard MTK state keys.
 
 `print_tracking_status(...)` uses this so it can show the current plant state
 with the same symbols used inside the controller.
@@ -1106,6 +1087,8 @@ function prepare_tracking_mpc_step!(ctrl::TrackingMPCController,
     return ctrl
 end
 
+_elapsed_wall_s(start_ns::Integer)::Float64 = (time_ns() - start_ns) / 1.0e9
+
 """
     solve_tracking_mpc!(ctrl, state_values, previous_controls; ...)
 
@@ -1131,10 +1114,13 @@ Algorithm:
 3. Check the termination status against the accepted MPC statuses.
 4. Read back the optimized control trajectories.
 5. Read back the predicted state or output trajectories.
-6. Compute high-level metrics such as the total objective and its main pieces.
+6. Compute metrics such as the total objective and its main pieces.
 7. Optionally print a compact live status line for the user.
 8. Save the last control sequence so the next MPC step can shift it as a warm
    start.
+
+If `return_timing=true`, the returned named tuple also includes a `timing`
+field with a wall-clock breakdown of the online MPC step.
 """
 function solve_tracking_mpc!(ctrl::TrackingMPCController,
                              state_values::AbstractDict,
@@ -1150,8 +1136,11 @@ function solve_tracking_mpc!(ctrl::TrackingMPCController,
                              status_control_syms=nothing,
                              status_digits::Int=3,
                              status_prefix::AbstractString="[MPC]",
+                             return_timing::Bool=false,
                              accepted_statuses=(MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.ALMOST_OPTIMAL, MOI.ALMOST_LOCALLY_SOLVED))
+    total_start_ns = time_ns()
     # Refresh ICs, warm starts, and first-move bounds before each solve.
+    prepare_start_ns = time_ns()
     prepare_tracking_mpc_step!(
         ctrl,
         state_values,
@@ -1160,8 +1149,13 @@ function solve_tracking_mpc!(ctrl::TrackingMPCController,
         upper_clip = upper_clip,
         atol = atol,
     )
+    prepare_tracking_mpc_step_s = _elapsed_wall_s(prepare_start_ns)
 
+    optimize_start_ns = time_ns()
     JuMP.optimize!(ctrl.model)
+    jump_optimize_s = _elapsed_wall_s(optimize_start_ns)
+
+    postprocess_start_ns = time_ns()
     status = JuMP.termination_status(ctrl.model)
     status in accepted_statuses || error("Tracking MPC solve failed with status $(status).")
 
@@ -1203,13 +1197,15 @@ function solve_tracking_mpc!(ctrl::TrackingMPCController,
         metrics[_metric_key("move", label)] = _value_or_float(ctrl.move_terms[canonical_sym])
         metrics[_metric_key("move1", label)] = _value_or_float(ctrl.first_move_terms[canonical_sym])
     end
+    solve_postprocess_s = _elapsed_wall_s(postprocess_start_ns)
 
-    result = (controls = controls, predictions = predictions, metrics = metrics, status = status)
+    status_print_s = 0.0
     if show_status
+        status_print_start_ns = time_ns()
         print_tracking_status(
             status_io,
             ctrl,
-            result;
+            (controls = controls, predictions = predictions, metrics = metrics, status = status);
             time = status_time,
             state_values = state_values,
             output_syms = status_output_syms,
@@ -1218,7 +1214,26 @@ function solve_tracking_mpc!(ctrl::TrackingMPCController,
             prefix = status_prefix,
             accepted_statuses = accepted_statuses,
         )
+        status_print_s = _elapsed_wall_s(status_print_start_ns)
     end
 
+    if return_timing
+        result = (
+            controls = controls,
+            predictions = predictions,
+            metrics = metrics,
+            status = status,
+            timing = (
+                prepare_tracking_mpc_step_s = prepare_tracking_mpc_step_s,
+                jump_optimize_s = jump_optimize_s,
+                solve_postprocess_s = solve_postprocess_s,
+                status_print_s = status_print_s,
+                total_s = _elapsed_wall_s(total_start_ns),
+            ),
+        )
+        return result
+    end
+
+    result = (controls = controls, predictions = predictions, metrics = metrics, status = status)
     return result
 end
