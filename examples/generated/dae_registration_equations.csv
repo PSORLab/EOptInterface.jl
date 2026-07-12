@@ -1,0 +1,5 @@
+system,equation_index,lhs_type,equation
+original,1,differential,Differential(t)(x(t)) ~ u - x(t) + z(t)
+original,2,algebraic,0 ~ -x(t) + sin(z(t)) + z(t)
+simplified,1,algebraic,0 ~ -x(t) + sin(z(t)) + z(t)
+simplified,2,differential,Differential(t)(x(t)) ~ u - x(t) + z(t)
