@@ -1,2 +1,0 @@
-timestamp,julia_version,active_project,nthreads,cpu_threads,kernel,machine,arch,hostname,profile_mode,offline_prewarm_enabled,run_count
-2026-04-21T15:12:11.691,1.12.4,c:\Users\pex21001\Dropbox\Research\Wastewater Treatment\Wastewater Treatment Repo\EOptInterface\EOptInterface.jl\examples\Project.toml,1,8,NT,x86_64-w64-mingw32,x86_64,CMFGMN2,single,true,1

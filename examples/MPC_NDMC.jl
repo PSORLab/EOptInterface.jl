@@ -50,10 +50,11 @@ provided by `obj_DMC(...)`.
 function Optim(t0,h,i_out,yk,s,u0,Pspan,M,w)
     u_lo = zeros(Float64,M)
     u_hi = 800.0*ones(Float64,M)
-    #model = Model(with_optimizer(Ipopt.Optimizer,tol = 0.001,bound_frac = 0.5*rand(1)[1]))
     model = Model(Ipopt.Optimizer)
     set_optimizer_attribute(model, "tol",1e-3)
-    set_optimizer_attribute(model, "bound_frac",0.5*rand(1)[1])
+    # Keep the historical solver setting deterministic so repeated benchmark
+    # runs produce the same reference trajectory.
+    set_optimizer_attribute(model, "bound_frac",0.25)
     set_optimizer_attribute(model, "print_level",0)
     function obj(u...)
         return obj_DMC(t0,h,i_out,yk,s,u0,Pspan,M,w,u...)

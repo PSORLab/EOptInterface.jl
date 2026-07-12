@@ -1,6 +1,7 @@
 using EOptInterface
 using Test
 using JuMP
+using Ipopt
 using ModelingToolkit
 using ModelingToolkit: t_nounits as t, D_nounits as D
 
@@ -278,6 +279,62 @@ end
         @test logctx.ts == [0.0]
         @test logctx.Xhist[x_sym] == [0.33]
         @test logctx.Controlhist[u_key] == [0.9]
+    end
+
+    @testset "tracking MPC ODE integrators" begin
+        ModelingToolkit.@parameters u_integrator = 0.0
+        ModelingToolkit.@variables x_integrator(t) = 0.0
+        ModelingToolkit.@named integrator_sys = ODESystem(
+            [D(x_integrator) ~ -x_integrator + u_integrator],
+            t,
+            [x_integrator],
+            [u_integrator],
+        )
+        x_key = only(collect(unknowns(integrator_sys)))
+
+        for integrator in ("EE", "IE", "BDF1", "RK4", "IRK4")
+            model = Model(Ipopt.Optimizer)
+            set_silent(model)
+            cfg = TrackingMPCConfig(
+                PH = 2,
+                CH = 2,
+                dt = 0.2,
+                integrator = integrator,
+                system_kind = :ode,
+                state_lower = -2.0,
+                state_upper = 2.0,
+                rhs0 = 0.0,
+            )
+            ctrl = build_tracking_mpc(
+                model,
+                integrator_sys;
+                control_specs = [
+                    MPCControlSpec(
+                        sym = integrator_sys.u_integrator,
+                        lower = -1.0,
+                        upper = 1.0,
+                        delta_max = 0.5,
+                        move_weight = 0.1,
+                    ),
+                ],
+                output_specs = [
+                    MPCOutputSpec(
+                        sym = x_key,
+                        setpoint = 0.5,
+                        track_weight = 1.0,
+                    ),
+                ],
+                config = cfg,
+            )
+            result = solve_tracking_mpc!(
+                ctrl,
+                Dict(x_key => 0.0),
+                Dict(integrator_sys.u_integrator => 0.0),
+            )
+            @test is_accepted_mpc_status(result.status)
+            @test all(isfinite, result.controls[integrator_sys.u_integrator])
+            @test all(isfinite, result.predictions[x_key])
+        end
     end
 
     @testset "indexed MTK state helpers" begin

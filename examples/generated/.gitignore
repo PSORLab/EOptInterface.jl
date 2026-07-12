@@ -1,2 +1,12 @@
 *
 !.gitignore
+!dae_registration_equations.csv
+!dae_registration_integrator_summary.csv
+!dae_registration_structure_summary.csv
+!dae_registration_trajectories.csv
+!legacy_mpc_ndmc_closed_loop_10s.csv
+!ndmc_conductivity_eopt_applied_control.csv
+!ndmc_conductivity_eopt_closed_loop.csv
+!ndmc_conductivity_eopt_name_map.csv
+!ndmc_vs_legacy_comparison_10s.csv
+!ndmc_vs_legacy_summary_10s.csv

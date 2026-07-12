@@ -4,7 +4,7 @@ CurrentModule = EOptInterface
 
 # EOptInterface
 
-Documentation for [EOptInterface](https://github.com/joseph03choi/EOptInterface.jl).
+Documentation for the [`MPC` research branch of EOptInterface](https://github.com/PSORLab/EOptInterface.jl/tree/MPC).
 
 ## Guides
 

@@ -364,13 +364,6 @@ function register_odesystem(model::JuMP.Model,
                             expression = Val{false})
     end
 
-    # Jacobian function for Rosenbrock methods.
-    Jfun = nothing
-    if intg in ("ROS2", "ROS", "ROSENBROCK")
-        J_expr = Symbolics.jacobian(dx_exprs, ModelingToolkit.unknowns(odesys))
-        Jfun = build_function(J_expr, decision_vars(odesys, p_disc)..., t_MTK; expression = Val{false})
-    end
-
     # 2) Check the discretized parameter arrays.
     for p in p_disc
         @assert haskey(p_disc_vars, p) "Missing p_disc_vars[$p] for $p (should have length N)"
@@ -444,7 +437,7 @@ function register_odesystem(model::JuMP.Model,
                 JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i]..., all_p_args_i..., t_at(i)))
             end
 
-        elseif intg == "IE"
+        elseif intg in ("IE", "BDF1")
             for j in 1:V
                 # Implicit Euler uses the next slope.
                 JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep * dx[j](xs[:, i+1]..., all_p_args_i..., t_at(i, c=1.0)))
@@ -495,7 +488,7 @@ function register_odesystem(model::JuMP.Model,
                 JuMP.@constraint(model, xs[j, i+1] == xs[j, i] + tstep*(b1*ks[j,1] + b2*ks[j,2]))
             end
         else
-            error("Available integrators: EE, IE, RK4, IRK4 (Gauss-Legendre 2-stage)")
+            error("Available integrators: EE, IE/BDF1, RK4, IRK4 (Gauss-Legendre 2-stage)")
         end
     end
 end

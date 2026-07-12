@@ -1,2 +1,0 @@
-run_label,offline_prewarm_s,build_system_s,build_controller_total_s,build_tracking_mpc_s,initial_mpc_step_total_s,closed_loop_simulation_s,total_script_s,control_interval_s,simulation_start_s,simulation_end_s,expected_total_solves,recorded_total_solves
-single,53.4422928,0.0183289,0.0137105,0.0130741,0.0175674,4.7105877,5.5686611,20.0,0.0,4000.0,201,201

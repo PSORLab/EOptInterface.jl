@@ -21,6 +21,7 @@ const NDMC_LEGACY_PSPAN = 400.0
 const NDMC_LEGACY_MSPAN = 60.0
 const NDMC_LEGACY_PH = Int(round(NDMC_LEGACY_PSPAN / NDMC_LEGACY_DT))
 const NDMC_LEGACY_CH = Int(round(NDMC_LEGACY_MSPAN / NDMC_LEGACY_DT))
+const NDMC_DEFAULT_SAVE_DT = 10.0
 
 # Physical and empirical parameters used by the NDMC plant model.
 const NDMC_M_N = 14.0067
@@ -496,7 +497,7 @@ Base.@kwdef struct NDMCMPCConfig
     disturbance_stop::Float64 = 2250.0
     Cs::Float64 = 285.0
     Cin_spike::NTuple{3, Float64} = (285.0, 285.0, 320.0)
-    save_dt::Float64 = 10.0
+    save_dt::Float64 = NDMC_DEFAULT_SAVE_DT
     initial_state::NTuple{5, Float64} = (280.0, 280.0, 280.0, 280.0, 0.0)
     state_lower::NTuple{5, Float64} = (0.0, 0.0, 0.0, 0.0, 0.0)
     state_upper::NTuple{5, Float64} = (600.0, 600.0, 600.0, 600.0, 20.0)
@@ -538,7 +539,7 @@ function load_config_from_env()
             parse(Float64, get(ENV, "NDMC_CIN2", "285.0")),
             parse(Float64, get(ENV, "NDMC_CIN3", "320.0")),
         ),
-        save_dt = parse(Float64, get(ENV, "NDMC_SAVE_DT", string(dt))),
+        save_dt = parse(Float64, get(ENV, "NDMC_SAVE_DT", string(NDMC_DEFAULT_SAVE_DT))),
         initial_state = (
             parse(Float64, get(ENV, "NDMC_C1_INIT", "280.0")),
             parse(Float64, get(ENV, "NDMC_C2_INIT", "280.0")),

@@ -1,248 +1,148 @@
-
-
 # EOptInterface.jl
 
-EOptInterface.jl is an abstraction layer for automatically formulating JuMP mathematical programming models from ModelingToolkit equation-oriented/acausal models.
+`EOptInterface.jl` connects equation-oriented models written in
+[`ModelingToolkit.jl`](https://github.com/SciML/ModelingToolkit.jl) with
+optimization problems written in [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl).
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/dev/)
-[![Build Status](https://github.com/PSORLab/EOptInterface.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/PSORLab/EOptInterface.jl/actions/workflows/CI.yml?query=branch%3Amaster)
+This `MPC` branch is a research branch. It contains the tracking MPC, DMC, NDMC,
+DAE, and wastewater examples developed on the ModelingToolkit 10 code line. The
+released package and newer ModelingToolkit 11 development are maintained on the
+repository's `main` branch. Results from this branch should therefore be cited
+with the branch name and commit hash.
 
-## Feature Summary
+[![Repository](https://img.shields.io/badge/repository-PSORLab%2FEOptInterface.jl-342674)](https://github.com/PSORLab/EOptInterface.jl)
+[![Main documentation](https://img.shields.io/badge/docs-main-blue.svg)](https://PSORLab.github.io/EOptInterface.jl/stable/)
 
-```julia
-decision_vars(::System)
+## Research workflow
+
+The main operations in this branch are:
+
+1. register a ModelingToolkit algebraic, ODE, or DAE model in JuMP;
+2. build one tracking MPC problem from the dynamic model;
+3. update measured states, setpoints, and disturbance previews online;
+4. solve the existing JuMP problem and apply the first control move;
+5. record trajectories and objective terms for analysis.
+
+The JuMP MPC model is built once. Closed-loop updates change numerical data and
+solve the same model again rather than rebuilding it at every sample.
+
+## Installation
+
+Clone the repository and select the research branch:
+
+```bash
+git clone https://github.com/PSORLab/EOptInterface.jl.git
+cd EOptInterface.jl
+git switch MPC
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
 ```
-Displays the optimization problem decision variables.
 
-```julia
-register_nlsystem(::Model, ::System, obj::Num, ineqs::Vector{Num})
+Run the package tests:
+
+```bash
+julia --project=. test/runtests.jl
 ```
-Registers algebraic JuMP constraints and objective from ModelingToolkit algebraic `System`s built using `@mtkbuild`.
 
-```julia
-full_solutions(::Model, ::System)
+The examples use a separate environment:
+
+```bash
+julia --project=examples -e 'using Pkg; Pkg.instantiate()'
 ```
-Returns a dictionary of optimal solution values for all eliminated variables from ModelingToolkit's structural simplification step.
 
-```julia
-register_odesystem(::Model, ::System, tspan::Tuple{Number,Number}, tstep::Number, solver::String)
+## Main functions
+
+- `register_nlsystem(...)` adds algebraic model equations to JuMP.
+- `register_odesystem(...)` discretizes an ODE model with `EE`, `IE`/`BDF1`,
+  `RK4`, or `IRK4` equations.
+- `register_daesystem(...)` retains differential and algebraic equations in the
+  prediction problem.
+- `build_tracking_mpc(...)` builds the tracking objective, state trajectories,
+  control trajectories, bounds, and move penalties.
+- `solve_tracking_mpc!(...)` updates one online MPC step and returns the control
+  and predicted-state trajectories.
+- `register_dmcsystem(...)` builds a step-response DMC prediction block.
+
+See [`docs/src/mpc_module.md`](docs/src/mpc_module.md) for a compact tracking MPC
+example.
+
+## Examples
+
+Small tracking MPC example:
+
+```bash
+julia --project=examples examples/tracking_mpc_demo.jl
 ```
-Registers algebraic JuMP constraints from ModelingToolkit ODE `System`s built using `@mtkbuild`. Available integration schemes: `"EE", "IE"`
 
+ODE and DAE registration examples:
 
-
-
-## Example Usage
-Optimizing algebraic `@mtkbuild` models using EAGO solver
-```julia
-using ModelingToolkit, JuMP, EOptInterface
-using ModelingToolkit: t_nounits as t, D_nounits as D
-
-@connector Stream begin
-    @variables begin
-        F(t),   [input=true]
-        y_A(t), [input=true]
-        y_B(t), [input=true]
-        y_C(t), [input=true]
-    end
-    @parameters begin
-        V_A = 8.937e-2
-        V_B = 1.018e-1
-        V_C = 1.13e-1
-    end
-end
-@mtkmodel Influent begin
-    @components begin
-        out = Stream()
-    end
-    @parameters begin
-        F
-        y_A = 1
-        y_B = 0
-        y_C = 0
-    end
-    @equations begin
-        out.F ~ F
-        out.y_A ~ y_A
-        out.y_B ~ y_B
-        out.y_C ~ y_C
-    end
-end
-@mtkmodel Mixer begin
-    @components begin
-        in1 = Stream()
-        in2 = Stream()
-        out = Stream()
-    end
-    @equations begin
-        out.F ~ in1.F + in2.F
-        out.y_A ~ (in1.y_A*in1.F + in2.y_A*in2.F)/(in1.F + in2.F)
-        out.y_B ~ (in1.y_B*in1.F + in2.y_B*in2.F)/(in1.F + in2.F)
-        out.y_C ~ (in1.y_C*in1.F + in2.y_C*in2.F)/(in1.F + in2.F)
-    end
-end
-@mtkmodel CSTR begin
-    @components begin
-        in = Stream()
-        out = Stream()
-    end
-    @parameters begin
-        V
-        k_1 = 0.4
-        k_2 = 0.055
-    end
-    begin
-        r_1 = k_1*out.y_A/(out.y_A*in.V_A + out.y_B*in.V_B + out.y_C*in.V_C)
-        r_2 = k_2*out.y_B/(out.y_A*in.V_A + out.y_B*in.V_B + out.y_C*in.V_C)
-    end
-    @equations begin
-        out.F ~ in.F
-        out.y_A + out.y_B + out.y_C ~ 1
-        out.y_B*out.F ~ in.y_B*in.F + (r_1 - r_2)*V
-        out.y_C*out.F ~ in.y_C*in.F + r_2*V
-    end
-end
-@mtkmodel Separator1 begin
-    @components begin
-        in = Stream()
-        outV = Stream()
-        outL = Stream()
-    end
-    @equations begin
-        in.F ~ outV.F + outL.F
-        in.y_B*in.F ~ outL.y_B*outL.F
-        in.y_C*in.F ~ outL.y_C*outL.F
-        
-        outV.y_A + outV.y_B + outV.y_C ~ 1
-        outV.y_C ~ 0
-        outV.y_B ~ 0
-
-        outL.y_A + outL.y_B + outL.y_C ~ 1
-        outL.y_A ~ 0
-    end
-end
-@mtkmodel Separator2 begin
-    @components begin
-        in = Stream()
-        outV = Stream()
-        outL = Stream()
-    end
-    @equations begin
-        in.F ~ outV.F + outL.F
-        in.y_B*in.F ~ outV.F
-
-        outV.y_A + outV.y_B + outV.y_C ~ 1
-        outV.y_A ~ 0
-        outV.y_C ~ 0
-
-        outL.y_A + outL.y_B + outL.y_C ~ 1
-        outL.y_A ~ 0
-        outL.y_B ~ 0
-    end
-end
-@mtkmodel ReactorSeparatorRecycle begin
-    @components begin
-        influent = Influent()
-        mixer = Mixer()
-        cstr = CSTR()
-        sep1 = Separator1()
-        sep2 = Separator2()
-    end
-    @equations begin
-        connect(influent.out, mixer.in1)
-        connect(mixer.out, cstr.in)
-        connect(cstr.out, sep1.in)
-        connect(sep1.outV, mixer.in2)
-        connect(sep1.outL, sep2.in)
-    end
-end
-
-@mtkcompile s = ReactorSeparatorRecycle()
-
-exprF5 = s.sep2.outV.F
-exprTau = s.cstr.V/(s.cstr.out.F*(s.cstr.out.y_A*s.cstr.in.V_A + s.cstr.out.y_B*s.cstr.in.V_B + s.cstr.out.y_C*s.cstr.in.V_C))
-f_CSTR = (25764 + 8178*s.cstr.V)/2.5
-s1cap = 132718 + s.cstr.out.F*(369*s.cstr.out.y_A - 1113.9*s.cstr.out.y_B)
-s2cap = 25000 + s.sep1.outL.F*(6984.5*s.sep1.outL.y_B - 3869.53*s.sep1.outL.y_C^2)
-s1op = s.cstr.out.F*(3+36.11*s.cstr.out.y_A + 7.71*s.cstr.out.y_B)*26.32e-3
-s2op = s.sep1.outL.F*(26.21 + 29.45*s.sep1.outL.y_B)*26.32e-3;
-f_Sep = (s1cap+s2cap)/2.5 + 0.52*(s1op+s2op)
-g1 = 25 - exprF5
-g2 = 475/3600 - exprTau
-obj = f_CSTR + f_Sep
-
-using EAGO
-model = Model(EAGO.Optimizer)
-decision_vars(s)
-xL = zeros(6)
-xU = [100, 1, 1, 1, 100, 10]
-@variable(model, xL[i] <= x[i=1:6] <= xU[i])
-register_nlsystem(model, s, obj, [g1, g2])
-JuMP.optimize!(model)
-JuMP.value.(x)
-full_solutions(model, s)
+```bash
+julia --project=examples examples/ode_model.jl
+julia --project=examples examples/dae_registration_demo.jl
 ```
-Optimizing ODE `System`s using EAGO solver
-```julia
-using ModelingToolkit, JuMP, EOptInterface
-using ModelingToolkit: t_nounits as t, D_nounits as D
 
-@mtkmodel KineticParameterEstimation begin
-    @parameters begin
-        T = 273
-        K_2 = 46*exp(6500/T-18)
-        K_3 = 2*K_2
-        k_1 = 53
-        k_1s = k_1*1e-6
-        k_5 = 1.2e-3
-        c_O2 = 2e-3
+The ODE parameter-estimation example uses EAGO for global optimization and can
+take several minutes. It is not part of the quick regression test.
 
-        k_2f
-        k_3f
-        k_4
-    end
-    @variables begin
-        x_A(t) = 0.0
-        x_B(t) = 0.0
-        x_D(t) = 0.0
-        x_Y(t) = 0.4
-        x_Z(t) = 140.0
-        I(t)
-    end
-    @equations begin
-        D(x_A) ~ k_1*x_Z*x_Y - c_O2*(k_2f + k_3f)*x_A + k_2f/K_2*x_D + k_3f/K_3*x_B - k_5*x_A^2
-        D(x_B) ~ c_O2*k_3f*x_A - (k_3f/K_3 + k_4)*x_B
-        D(x_D) ~ c_O2*k_2f*x_A - k_2f/K_2*x_D
-        D(x_Y) ~ -k_1s*x_Z*x_Y
-        D(x_Z) ~ -k_1*x_Z*x_Y
-        I ~ x_A + 2/21*x_B + 2/21*x_D
-    end
-end
+NDMC conductivity closed-loop experiment:
 
-@mtkcompile o = KineticParameterEstimation()
-
-tspan = (0.0,2.0)
-tstep = 0.01
-include("kinetic_intensity_data.jl")
-intensity(x_A,x_B,x_D) = x_A + 2/21*x_B + 2/21*x_D
-
-using EAGO
-model = Model(EAGO.Optimizer)
-decision_vars(o)
-N = Int(floor((tspan[2] - tspan[1])/tstep))+1
-V = length(unknowns(o))
-@variable(model, -75 <= z[1:V,1:N] <= 150.0 ) # ̇z = (x_Z(t), x_Y(t), x_D(t), x_B(t), x_A(t))
-pL = [10, 10, 0.001]
-pU = [1200, 1200, 40]
-@variable(model, pL[i] <= p[i=1:3] <= pU[i]) # p = (k_2f, k_3f, k_4)
-register_odesystem(model, o, tspan, tstep, "EE")
-@objective(model, Min, sum((intensity(z[5,i],z[4,i],z[3,i]) - data[i-1])^2 for i in 2:N))
-JuMP.optimize!(model)
+```bash
+NDMC_SHOW_DETAILED_STATUS=1 \
+  julia --project=examples examples/ndmc_conductivity_mpc_demo.jl
 ```
+
+The NDMC implementation is organized as:
+
+- `examples/ndmc_conductivity_mpc_demo.jl`: command-line entry point;
+- `examples/NDMCExample.jl`: names used by the script and notebook;
+- `examples/ndmc_case.jl`: plant, controller, closed-loop simulation, and timing;
+- `examples/ndmc_plots.jl`: NDMC figures;
+- `notebooks/ndmc_conductivity_mpc_simple.ipynb`: interactive experiment.
+
+## Canonical NDMC case
+
+| Setting | Value |
+|---|---:|
+| Simulation interval | 0-4000 s |
+| MPC sample time | 20 s |
+| Saved trajectory interval | 10 s |
+| Prediction span | 400 s |
+| Move span | 60 s |
+| Conductivity setpoint | 280 |
+| Aeration bounds | 0-800 |
+| Influent shock | 2100-2250 s |
+| Shock value in zone 3 | 320 |
+
+The canonical result files in `examples/generated/` use this case. Timing and
+machine-information files are intentionally not versioned because they depend
+on the computer and Julia session used for the run.
+
+## Notebook use
+
+Start the notebook from the repository root so its first cell can locate
+`notebooks/bootstrap_examples_notebook_env.jl`. The first cell activates and
+instantiates the shared `examples/` environment. The main experiment cells are
+separate from optional timing cells so scientific results can be reproduced
+without running the benchmarking workflow.
+
+## Documentation
+
+Build the local documentation with:
+
+```bash
+julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+julia --project=docs docs/make.jl
+```
+
+## Reproducibility note
+
+When reporting numerical results, record the branch, commit hash, Julia version,
+solver version, controller settings, and whether the run used the canonical
+10 s saved-output interval. The legacy DMC comparison uses a deterministic Ipopt
+initialization setting.
 
 ## References
-1. Y. Ma, S. Gowda, R. Anantharaman, C. Laughman, V. Shah, and C. Rackauckas, **ModelingToolkit: A composable graph transformation system for equation-based modeling**, 2021.
-2. M. Lubin, O. Dowson, J. Dias Garcia, J. Huchette, B. Legat, and J. P. Vielma, **JuMP 1.0: Recent improvements to a modeling language for mathematical optimization**, *Mathematical Programming Computation*, vol. 15, p. 581-589, 2023.
-3. M. Wilhelm and M. Stuber, **EAGO.jl Easy Advanced Global Optimization in Julia**, *Optimization Methods and Software*, vol. 37, no. 2, pp. 425-450, 2022.
 
+1. Y. Ma et al., "ModelingToolkit: A composable graph transformation system for
+   equation-based modeling," 2021.
+2. M. Lubin et al., "JuMP 1.0: Recent improvements to a modeling language for
+   mathematical optimization," *Mathematical Programming Computation*, 2023.

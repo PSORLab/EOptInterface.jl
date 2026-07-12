@@ -5,6 +5,10 @@ examples in this repository. It is written as a reproducible research note:
 what model is used, what the controller changes, what output is tracked, and
 what gets updated at each sampling time.
 
+This page describes the `MPC` research branch, which uses ModelingToolkit 10.
+It is separate from the released `main` branch and should be cited with its
+branch name and commit hash.
+
 ## Basic Workflow
 
 For a mechanistic plant model, the normal workflow is:
@@ -165,6 +169,10 @@ The NDMC case now has one repository implementation:
 `examples/ndmc_case.jl` and the plotting code from `examples/ndmc_plots.jl`.
 The repository notebook,
 `notebooks/ndmc_conductivity_mpc_simple.ipynb`, runs the same case.
+
+The canonical NDMC run uses a 20 s MPC sample time and saves the plant
+trajectory every 10 s over 0-4000 s. Versioned comparison CSVs use the same
+10 s output grid. Timing tables are machine dependent and are not versioned.
 
 For debugging a failed solve, the helper routines in `src/mpcutils.jl` can
 print constraints, check initial-condition synchronization, and record MPC

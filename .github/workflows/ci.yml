@@ -1,0 +1,29 @@
+name: MPC research branch CI
+
+on:
+  pull_request:
+    branches: [MPC]
+  push:
+    branches: [MPC]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.11', '1.12']
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@v3
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1

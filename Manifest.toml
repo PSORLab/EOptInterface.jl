@@ -504,7 +504,7 @@ version = "1.8.0"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [[deps.EOptInterface]]
-deps = ["JuMP", "ModelingToolkit"]
+deps = ["Ipopt", "JuMP", "ModelingToolkit"]
 path = "."
 uuid = "96d9f51d-8c41-4e2d-b1a3-7b48dea3ddd1"
 version = "0.1.0-DEV"
@@ -662,9 +662,9 @@ version = "1.13.1"
 
 [[deps.Hwloc_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "XML2_jll", "Xorg_libpciaccess_jll"]
-git-tree-sha1 = "baaaebd42ed9ee1bd9173cfd56910e55a8622ee1"
+git-tree-sha1 = "c35847ca5b4997fc8418836354a56c459bcf48d8"
 uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
-version = "2.13.0+1"
+version = "2.14.0+0"
 
 [[deps.HypergeometricFunctions]]
 deps = ["LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
@@ -1081,10 +1081,10 @@ weakdeps = ["Adapt"]
     OffsetArraysAdaptExt = "Adapt"
 
 [[deps.OpenBLAS32_jll]]
-deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "46cce8b42186882811da4ce1f4c7208b02deb716"
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "libblastrampoline_jll"]
+git-tree-sha1 = "8b492aefdd20fb9dc1ebc377ff7e5fa1591c9acc"
 uuid = "656ef2d0-ae68-5445-9ca0-591084a874a2"
-version = "0.3.30+0"
+version = "0.3.33+2"
 
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
@@ -1757,9 +1757,9 @@ version = "2.13.9+0"
 
 [[deps.Xorg_libpciaccess_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
-git-tree-sha1 = "4909eb8f1cbf6bd4b1c30dd18b2ead9019ef2fad"
+git-tree-sha1 = "58972370b81423fc546c56a60ed1a009450177c3"
 uuid = "a65dc6b1-eb27-53a1-bb3e-dea574b5389e"
-version = "0.18.1+0"
+version = "0.19.0+0"
 
 [[deps.Zlib_jll]]
 deps = ["Libdl"]

@@ -5,11 +5,11 @@ DocMeta.setdocmeta!(EOptInterface, :DocTestSetup, :(using EOptInterface); recurs
 
 makedocs(;
     modules=[EOptInterface],
-    authors="Joseph Choi <joseph03choi@gmail.com>",
+    authors="Joseph Choi, Dimitri Alston, Pengfei Xu, and Matthew Stuber",
     sitename="EOptInterface.jl",
     format=Documenter.HTML(;
-        canonical="https://joseph03choi.github.io/EOptInterface.jl",
-        edit_link="master",
+        canonical="https://PSORLab.github.io/EOptInterface.jl/mpc/",
+        edit_link="MPC",
         assets=String[],
     ),
     pages=[
@@ -19,6 +19,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/joseph03choi/EOptInterface.jl",
-    devbranch="master",
+    repo="github.com/PSORLab/EOptInterface.jl",
+    devbranch="MPC",
+    devurl="mpc",
 )
