@@ -94,7 +94,8 @@ The NDMC implementation is organized as:
 
 - `examples/ndmc_conductivity_mpc_demo.jl`: command-line entry point;
 - `examples/NDMCExample.jl`: names used by the script and notebook;
-- `examples/ndmc_case.jl`: plant, controller, closed-loop simulation, and timing;
+- `examples/ndmc_case.jl`: plant, controller, and closed-loop simulation;
+- `examples/ndmc_profile.jl`: optional timing and benchmarking reports;
 - `examples/ndmc_plots.jl`: NDMC figures;
 - `notebooks/ndmc_conductivity_mpc_simple.ipynb`: interactive experiment.
 

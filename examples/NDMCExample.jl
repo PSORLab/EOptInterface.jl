@@ -12,6 +12,7 @@ using Sockets
 using Plots
 
 include("ndmc_case.jl")
+include("ndmc_profile.jl")
 include("ndmc_plots.jl")
 
 # Main experiment settings and output filenames.
@@ -42,20 +43,9 @@ export NDMC_APPLIED_CONTROL_FILENAME,
        ndmc_plot_shock_window_c3,
        ndmc_plot_shock_window_pair,
        ndmc_plot_shock_window_qair,
-       ndmc_plot_supporting_states,
+       ndmc_plot_supporting_states
 
-       # Optional timing/profiling tables for reports.
-       NDMCTimingProfile,
-       ndmc_btime_profile_tables,
-       ndmc_btime_snapshot_values,
-       ndmc_default_btime_snapshot_time,
-       ndmc_profile_output_paths,
-       ndmc_timing_workbook_path,
-       run_ndmc_profile_cases,
-       run_ndmc_workflow_timing_report,
-       run_ndmc_isolated_btime_report,
-       run_ndmc_whole_workflow_btime,
-       save_ndmc_profile_outputs!,
-       save_ndmc_timing_workbook!
+# Timing functions remain available as `NDMCExample.<function>` but are not
+# imported by default into the scientific notebook namespace.
 
 end # module

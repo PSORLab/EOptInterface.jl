@@ -1,0 +1,4 @@
+.DS_Store
+.ipynb_checkpoints/
+usol_MPC.csv
+examples/.notebook_precompile_v*.stamp

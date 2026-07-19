@@ -166,7 +166,8 @@ For the tracking-MPC path:
 
 The NDMC case now has one repository implementation:
 `examples/NDMCExample.jl` loads the model and simulation code from
-`examples/ndmc_case.jl` and the plotting code from `examples/ndmc_plots.jl`.
+`examples/ndmc_case.jl`, optional timing code from `examples/ndmc_profile.jl`,
+and plotting code from `examples/ndmc_plots.jl`.
 The repository notebook,
 `notebooks/ndmc_conductivity_mpc_simple.ipynb`, runs the same case.
 
