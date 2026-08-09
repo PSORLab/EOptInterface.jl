@@ -25,5 +25,10 @@ jobs:
         with:
           version: ${{ matrix.version }}
       - uses: julia-actions/cache@v3
+      # The committed manifest records the Julia 1.12 research environment.
+      # Resolve from Project.toml when testing other supported Julia versions.
+      - name: Use dependencies compatible with the matrix Julia version
+        shell: bash
+        run: rm -f Manifest.toml
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
