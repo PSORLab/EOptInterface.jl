@@ -111,6 +111,114 @@ end
 """
     $(DocStringExtensions.TYPEDSIGNATURES)
 
+Automatically applies specified direct transcription method and registers the 
+discretized ODE `ModelingToolkit.System` as algebraic JuMP constraints besides adding constraints of algebraic 
+equations in the DAE model.
+Currently supports Explicit Euler "EE" and Implicit Euler "IE".
+"""
+function register_daesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspan::Tuple{Real,Real}, tstep::Real, integrator::String)
+    if integrator != "EE" && integrator != "IE"
+        error("Available integrators: EE, IE")
+    end
+    # Number of discrete time nodes
+    N = Int(floor((tspan[2] - tspan[1]) / tstep)) + 1
+    # Number of ODE variables
+    V = length(ModelingToolkit.unknowns(sys))
+
+    init_values = copy(ModelingToolkit.initial_conditions(sys).dict)
+    param_keys = ModelingToolkit.parameters(sys)
+    param_dict = Dict()
+    dvars = decision_vars(sys)
+    sys_unknowns = ModelingToolkit.unknowns(sys)
+    for key in param_keys
+        if any(isequal(key), dvars)
+            continue
+        else
+            param_dict[key] = init_values[key]
+        end
+    end
+
+    dx_funcs = []
+    x_funcs = []
+    
+
+    for j in 1:V # j is the counter for each unknown state variables (this does not include unknown parameters)
+        if string(ModelingToolkit.full_equations(sys)[j].lhs) == "0"
+            # the equation is algebraic
+            expr_j = ModelingToolkit.full_equations(sys)[j].rhs
+            expr_j = SymbolicUtils.substitute(expr_j, ModelingToolkit.bindings(sys))
+            expr_j = SymbolicUtils.substitute(expr_j, ModelingToolkit.bindings(sys))
+            # Fully substitute fixed parameters with default values
+            while ~isempty(intersect(Symbolics.get_variables(expr_j), keys(param_dict)))
+                expr_j = SymbolicUtils.substitute(expr_j, param_dict)
+            end
+            # Build runtime callable (remaining free symbols: state vars + decision vars)
+            xj_func = Symbolics.build_function(
+                expr_j,
+                dvars...,
+                expression=Val{false}
+            )
+            push!(x_funcs, xj_func)
+
+        else
+            # the equation is Differential
+            expr_j = ModelingToolkit.full_equations(sys)[j].rhs
+            expr_j = SymbolicUtils.substitute(expr_j, ModelingToolkit.bindings(sys))
+            expr_j = SymbolicUtils.substitute(expr_j, ModelingToolkit.bindings(sys))
+            # Fully substitute fixed parameters with default values
+            while ~isempty(intersect(Symbolics.get_variables(expr_j), keys(param_dict)))
+                expr_j = SymbolicUtils.substitute(expr_j, param_dict)
+            end
+
+            # Build runtime callable (remaining free symbols: state vars + decision vars)
+            dxj_func = Symbolics.build_function(
+                expr_j,
+                dvars...,
+                expression=Val{false}
+            )
+            push!(dx_funcs, dxj_func)
+        end
+
+    end
+
+    # Extract JuMP decision variable vector (pure parameters, not state vars)
+    ps = JuMP.all_variables(model)[end-length(setdiff(dvars, sys_unknowns))+1:end]
+    # Reshape remaining JuMP variables into state trajectory matrix [V × N]
+    xs = reshape(setdiff(JuMP.all_variables(model), ps), V, N)
+
+    # Extract initial conditions from the ModelingToolkit system and fix them in the JuMP model for x[1:V,1]
+
+    
+
+    for (i, unk_var) in enumerate(sys_unknowns)
+        if haskey(init_values, unk_var)
+            JuMP.fix(xs[i, 1], init_values[unk_var].val, force=true)
+        end
+    end
+
+    # Formulate ODE discretization constraints
+    if integrator == "EE"
+        # Differential equations: Explicit Euler
+        JuMP.@constraint(model, [j in 1:length(dx_funcs), i in 1:(N-1)],
+            xs[j, i+1] == xs[j, i] + tstep * dx_funcs[j](xs[:, i]..., ps...))
+        # Algebraic equations: enforce at each step i
+        JuMP.@constraint(model, [j in 1:length(x_funcs), i in 1:N],
+            x_funcs[j](xs[:, i]..., ps...) == 0)
+
+    elseif integrator == "IE"
+        # Differential equations: Implicit Euler
+        JuMP.@constraint(model, [j in 1:length(dx_funcs), i in 1:(N-1)],
+            xs[j, i+1] == xs[j, i] + tstep * dx_funcs[j](xs[:, i+1]..., ps...))
+        # Algebraic equations: enforce at each step i+1
+        JuMP.@constraint(model, [j in 1:length(x_funcs), i in 1:(N-1)],
+            x_funcs[j](xs[:, i+1]..., ps...) == 0)
+    end
+
+    return
+end
+"""
+    $(DocStringExtensions.TYPEDSIGNATURES)
+
 Returns a dictionary of optimal solution values for the observed variables of a 
 `ModelingToolkit.System` if the `JuMP.Model` is solved.
 """

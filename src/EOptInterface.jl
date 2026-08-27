@@ -31,6 +31,6 @@ module EOptInterface
     include("userfuncs.jl")
 
     # Exports
-    export decision_vars, full_solution, register_nlsystem, register_odesystem
+    export decision_vars, full_solution, register_nlsystem, register_odesystem, register_daesystem
 
 end

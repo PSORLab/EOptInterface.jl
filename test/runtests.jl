@@ -232,3 +232,54 @@ end
     @test isapprox(JuMP.objective_value(model), 16796.032234817612, atol=1e-3)
 
 end
+
+@testset "DAE Model" begin
+
+    @mtkmodel TankValve begin
+        @parameters begin
+            A = 1.0     # tank cross-section area  [m²]
+            q_in = 2.0     # constant inlet flow      [m³/s]
+            k_v                # valve coefficient (FREE – no default)
+        end
+        @variables begin
+            h(t) = 1.0    # liquid level [m]  (ODE state, IC = 1)
+            q_out(t), [irreducible=true]           # outlet flow  [m³/s] (algebraic, no IC)
+        end
+        @equations begin
+            # ODE: tank mass balance
+            D(h) ~ (q_in - q_out) / A
+            # Algebraic constraint: valve equation  (written as 0 ~ rhs)
+            q_out ~ k_v * sqrt(h)
+        end
+    end
+
+    @mtkcompile system = TankValve()
+
+    tspan = (0.0, 10.0)
+    tstep = 0.01
+
+    N = Int(floor((tspan[2] - tspan[1]) / tstep)) + 1
+    V = length(ModelingToolkit.unknowns(system))
+    n_dvars = length(decision_vars(system))
+    P = n_dvars - V # number of parameters
+
+    model = JuMP.Model(Ipopt.Optimizer)
+
+    # State trajectory variables  [V × N]
+    JuMP.@variable(model, 0.0 <= xs[1:V, 1:N] <= 100.0)
+    # Free parameter variables    [P]
+    JuMP.@variable(model, 0.01 <= ps[1:P] <= 10.0)
+    
+    register_daesystem(model, system, tspan, tstep, "EE")
+
+    h_target = 4.0
+    # h is the first unknown → xs[1, N]
+    JuMP.@objective(model, Min, (xs[1, N] - h_target)^2)
+
+    JuMP.optimize!(model)
+    soln_dict = EOptInterface.full_solution(model, system)
+    @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
+    @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT
+    @test isapprox(JuMP.objective_value(model), 0.0, atol=1e-3)
+    @test isapprox(JuMP.value(ps[1]), 0.9698, atol = 1e-3)
+end
