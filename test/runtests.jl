@@ -234,6 +234,7 @@ end
 end
 
 @testset "DAE Model" begin
+
     @mtkmodel TankValve begin
         @parameters begin
             A = 1.0     # tank cross-section area  [m²]
@@ -242,13 +243,13 @@ end
         end
         @variables begin
             h(t) = 1.0    # liquid level [m]  (ODE state, IC = 1)
-            q_out(t)           # outlet flow  [m³/s] (algebraic, no IC)
+            q_out(t), [irreducible=true]           # outlet flow  [m³/s] (algebraic, no IC)
         end
         @equations begin
             # ODE: tank mass balance
             D(h) ~ (q_in - q_out) / A
             # Algebraic constraint: valve equation  (written as 0 ~ rhs)
-            0 ~ q_out - k_v * sqrt(h)
+            q_out ~ k_v * sqrt(h)
         end
     end
 
@@ -258,9 +259,9 @@ end
     tstep = 0.01
 
     N = Int(floor((tspan[2] - tspan[1]) / tstep)) + 1
-    V = length(ModelingToolkit.unknowns(sys))
-    n_dvars = length(decision_vars(sys))
-    P = n_dvars - V                      # number of free parameters
+    V = length(ModelingToolkit.unknowns(system))
+    n_dvars = length(decision_vars(system))
+    P = n_dvars - V # number of parameters
 
     model = JuMP.Model(Ipopt.Optimizer)
 
@@ -268,13 +269,14 @@ end
     JuMP.@variable(model, 0.0 <= xs[1:V, 1:N] <= 100.0)
     # Free parameter variables    [P]
     JuMP.@variable(model, 0.01 <= ps[1:P] <= 10.0)
-    register_daesystem(model, system, tspan, tstep, "IE")
+    
+    register_daesystem(model, system, tspan, tstep, "EE")
 
     h_target = 4.0
     # h is the first unknown → xs[1, N]
-    JuMP.@objective(jump_model, Min, (xs[1, N] - h_target)^2)
+    JuMP.@objective(model, Min, (xs[1, N] - h_target)^2)
 
-    JuMP.optimize!(jump_model)
+    JuMP.optimize!(model)
     soln_dict = EOptInterface.full_solution(model, system)
     @test JuMP.termination_status(model) == JuMP.LOCALLY_SOLVED
     @test JuMP.primal_status(model) == JuMP.FEASIBLE_POINT

@@ -126,11 +126,12 @@ function register_daesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspa
     V = length(ModelingToolkit.unknowns(sys))
 
     init_values = copy(ModelingToolkit.initial_conditions(sys).dict)
-    param_keys = parameters(sys)
+    param_keys = ModelingToolkit.parameters(sys)
     param_dict = Dict()
-
+    dvars = decision_vars(sys)
+    sys_unknowns = ModelingToolkit.unknowns(sys)
     for key in param_keys
-        if any(isequal(key), decision_vars(sys))
+        if any(isequal(key), dvars)
             continue
         else
             param_dict[key] = init_values[key]
@@ -139,7 +140,7 @@ function register_daesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspa
 
     dx_funcs = []
     x_funcs = []
-    dvars = decision_vars(sys)
+    
 
     for j in 1:V # j is the counter for each unknown state variables (this does not include unknown parameters)
         if string(ModelingToolkit.full_equations(sys)[j].lhs) == "0"
@@ -181,13 +182,13 @@ function register_daesystem(model::JuMP.Model, sys::ModelingToolkit.System, tspa
     end
 
     # Extract JuMP decision variable vector (pure parameters, not state vars)
-    ps = JuMP.all_variables(model)[end-length(setdiff(decision_vars(sys), ModelingToolkit.unknowns(sys)))+1:end]
+    ps = JuMP.all_variables(model)[end-length(setdiff(dvars, sys_unknowns))+1:end]
     # Reshape remaining JuMP variables into state trajectory matrix [V × N]
     xs = reshape(setdiff(JuMP.all_variables(model), ps), V, N)
 
     # Extract initial conditions from the ModelingToolkit system and fix them in the JuMP model for x[1:V,1]
 
-    sys_unknowns = ModelingToolkit.unknowns(sys)
+    
 
     for (i, unk_var) in enumerate(sys_unknowns)
         if haskey(init_values, unk_var)
