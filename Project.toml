@@ -20,6 +20,7 @@ EOIInfiniteOptExt = "InfiniteOpt"
 
 [compat]
 DocStringExtensions = "0.9"
+InfiniteOpt = "0.6.4"
 JuMP = "1"
 ModelingToolkit = "11"
 Reexport = "1"
