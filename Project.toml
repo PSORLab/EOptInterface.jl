@@ -19,7 +19,7 @@ InfiniteOpt = "20393b10-9daf-11e9-18c9-8db751c92c57"
 EOIInfiniteOptExt = "InfiniteOpt"
 
 [compat]
-DocStringExtensions = "0.9"
+DocStringExtensions = "0.9, 0.10"
 JuMP = "1"
 ModelingToolkit = "11"
 Reexport = "1"
